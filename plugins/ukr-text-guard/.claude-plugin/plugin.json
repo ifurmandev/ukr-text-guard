@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin.json",
+  "name": "ukr-text-guard",
+  "displayName": "Ukr Text Guard (детектор + редактор)",
+  "description": "Детектор ознак ШІ в українських текстах і редактор живої української — 2 в 1: аудит з індексом 0–100 і доказами, правки «було → стало → чому», повний цикл із контрольним заміром.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Ihor Furman",
+    "url": "https://ifurman.dev"
+  },
+  "homepage": "https://github.com/ifurman-dev/ifurman-plugins",
+  "repository": "https://github.com/ifurman-dev/ifurman-plugins",
+  "license": "MIT",
+  "keywords": [
+    "ukrainian",
+    "ai-detection",
+    "writing",
+    "editing",
+    "seo",
+    "content"
+  ]
+}
