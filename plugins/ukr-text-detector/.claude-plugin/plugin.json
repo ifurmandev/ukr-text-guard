@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin.json",
+  "name": "ukr-text-detector",
+  "displayName": "Ukr Text Detector",
+  "description": "Аудит українських текстів, сторінок і документів на ознаки написання ШІ: індекс 0–100, цитати-докази, гарячі точки, розпізнавання обфускації та слідів чату. Тільки аналіз, без правок.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Ihor Furman",
+    "url": "https://ifurman.dev"
+  },
+  "homepage": "https://github.com/ifurman-dev/ifurman-plugins",
+  "repository": "https://github.com/ifurman-dev/ifurman-plugins",
+  "license": "MIT",
+  "keywords": [
+    "ukrainian",
+    "ai-detection",
+    "content-audit",
+    "seo"
+  ]
+}
