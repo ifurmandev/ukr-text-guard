@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "ifurman-plugins",
+  "description": "Плагіни IFurman.dev для Claude: робота з українськими текстами (детекція ШІ, редагування) та внутрішні правила проєктів.",
+  "version": "1.0.0",
+  "owner": {
+    "name": "Ihor Furman",
+    "url": "https://ifurman.dev"
+  },
+  "metadata": {
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "ukr-text-guard",
+      "source": "./plugins/ukr-text-guard",
+      "description": "Детектор ознак ШІ в українських текстах і редактор живої української — 2 в 1: аудит з індексом 0–100 і доказами, правки «було → стало → чому», повний цикл із контрольним заміром.",
+      "category": "writing",
+      "tags": [
+        "ukrainian",
+        "ai-detection",
+        "writing",
+        "editing",
+        "seo",
+        "content"
+      ]
+    },
+    {
+      "name": "ukr-text-detector",
+      "source": "./plugins/ukr-text-detector",
+      "description": "Аудит українських текстів, сторінок і документів на ознаки написання ШІ: індекс 0–100, цитати-докази, гарячі точки, розпізнавання обфускації та слідів чату. Тільки аналіз, без правок.",
+      "category": "writing",
+      "tags": [
+        "ukrainian",
+        "ai-detection",
+        "content-audit",
+        "seo"
+      ]
+    },
+    {
+      "name": "ukr-text-editor",
+      "source": "./plugins/ukr-text-editor",
+      "description": "Редактор живої української: складні речення, дієприслівники, відокремлені обставини, нестандартний синтаксис, багатий словник і дозовані діалектизми в діловому, технічному чи літературно-розважальному стилі.",
+      "category": "writing",
+      "tags": [
+        "ukrainian",
+        "editing",
+        "copywriting",
+        "style"
+      ]
+    },
+    {
+      "name": "ifurman-frontend-review",
+      "source": "./plugins/ifurman-frontend-review",
+      "description": "Правила верстки, типографіки, фактології та протокол комітів для сайту ifurman.dev (Astro 5 + Tailwind 4).",
+      "category": "development",
+      "tags": [
+        "astro",
+        "tailwind",
+        "frontend",
+        "code-review"
+      ]
+    }
+  ]
+}
