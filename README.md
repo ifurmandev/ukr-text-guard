@@ -1,12 +1,12 @@
-# ifurman-plugins
+# ukr-text-guard
 
-Маркетплейс плагінів для Claude (Claude Code, Claude Desktop, claude.ai). Основний блок — агенти для роботи з українськими текстами: детекція написаного штучним інтелектом і редагування живою мовою.
+Маркетплейс плагінів `ifurman` для Claude (Claude Code, Claude Desktop, claude.ai). Основний блок — агенти для роботи з українськими текстами: детекція написаного штучним інтелектом і редагування живою мовою.
 
 ## Підключення
 
 ```bash
-/plugin marketplace add ifurman-dev/ifurman-plugins
-/plugin install ukr-text-guard@ifurman-plugins
+/plugin marketplace add ifurmandev/ukr-text-guard
+/plugin install ukr-text-guard@ifurman
 ```
 
 Далі плагіни видно в `/plugin`. Для команди чи кількох машин маркетплейс можна прописати в `.claude/settings.json`:
@@ -14,11 +14,11 @@
 ```json
 {
   "extraKnownMarketplaces": {
-    "ifurman-plugins": {
-      "source": { "source": "github", "repo": "ifurman-dev/ifurman-plugins" }
+    "ifurman": {
+      "source": { "source": "github", "repo": "ifurmandev/ukr-text-guard" }
     }
   },
-  "enabledPlugins": { "ukr-text-guard@ifurman-plugins": true }
+  "enabledPlugins": { "ukr-text-guard@ifurman": true }
 }
 ```
 

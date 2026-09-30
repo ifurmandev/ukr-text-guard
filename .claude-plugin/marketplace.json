@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
-  "name": "ifurman-plugins",
+  "name": "ifurman",
   "description": "Плагіни IFurman.dev для Claude: робота з українськими текстами (детекція ШІ, редагування) та внутрішні правила проєктів.",
   "version": "1.0.0",
   "owner": {

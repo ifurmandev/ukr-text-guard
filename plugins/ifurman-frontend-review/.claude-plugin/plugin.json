@@ -8,8 +8,8 @@
     "name": "Ihor Furman",
     "url": "https://ifurman.dev"
   },
-  "homepage": "https://github.com/ifurman-dev/ifurman-plugins",
-  "repository": "https://github.com/ifurman-dev/ifurman-plugins",
+  "homepage": "https://github.com/ifurmandev/ukr-text-guard",
+  "repository": "https://github.com/ifurmandev/ukr-text-guard",
   "license": "MIT",
   "keywords": [
     "astro",
