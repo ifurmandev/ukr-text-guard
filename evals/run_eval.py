@@ -42,7 +42,8 @@ def judge(category, known_gap, outcome):
     return Verdict(True, None, None, index >= HIGH_LEVEL)
 
 
-Classified = namedtuple("Classified", "human ai unclassified ignored total files", defaults=({},))
+Classified = namedtuple("Classified", "human ai unclassified ignored total files duplicates",
+                        defaults=({}, {}))
 
 
 def classify_folder(samples_dir):
@@ -50,7 +51,7 @@ def classify_folder(samples_dir):
 
     Розширення .txt береться в будь-якому регістрі; files дає справжню назву файлу за назвою зразка.
     """
-    human, ai, unclassified, ignored, files = [], [], [], [], {}
+    human, ai, unclassified, ignored, files, duplicates = [], [], [], [], {}, {}
     samples_dir = Path(samples_dir)
     items = sorted(samples_dir.iterdir(), key=lambda p: p.name) if samples_dir.is_dir() else []
     for item in items:
@@ -58,6 +59,7 @@ def classify_folder(samples_dir):
             ignored.append(item.name)
         elif item.stem in files:
             unclassified.append(item.name)  # той самий зразок у двох регістрах розширення
+            duplicates[item.name] = files[item.stem]
         elif item.stem.startswith("human-"):
             human.append(item.stem)
             files[item.stem] = item.name
@@ -66,7 +68,7 @@ def classify_folder(samples_dir):
             files[item.stem] = item.name
         else:
             unclassified.append(item.name)
-    return Classified(human, ai, unclassified, ignored, len(items), files)
+    return Classified(human, ai, unclassified, ignored, len(items), files, duplicates)
 
 
 def missing_categories(classified):
@@ -185,13 +187,20 @@ def analyze_sample(analyzer_path, sample_path):
 Row = namedtuple("Row", "name category known_gap outcome verdict hidden")
 
 
+def _unclassified_reason(name, classified):
+    kept = classified.duplicates.get(name)
+    if kept:
+        return "same sample name as %s in another letter case" % kept
+    return "file name is not human-*.txt or ai-*.txt"
+
+
 def _gather(root, analyzer_path):
     """Класифікує теку, застосовує known-gap, аналізує та оцінює кожен зразок за порядком назв."""
     root = Path(root)
     classified = classify_folder(root / "evals" / "samples")
     entries = read_known_gaps(root / "evals" / "known-gaps.txt")
     flagged, gap_errors = apply_known_gaps(entries, classified)
-    errors = [Error("eval.unclassified_sample", n, "file name is not human-*.txt or ai-*.txt")
+    errors = [Error("eval.unclassified_sample", n, _unclassified_reason(n, classified))
               for n in classified.unclassified]
     errors += gap_errors
     errors += [Error("eval.missing_category", c, "no samples in this category")

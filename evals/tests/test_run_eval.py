@@ -129,6 +129,23 @@ class ClassifyFolderTest(unittest.TestCase):
         self.assertEqual(c.files["human-x"], "human-x.TXT")
         self.assertEqual(c.files["ai-b"], "ai-b.txt")
 
+    def test_same_name_in_two_letter_cases_is_a_collision(self):
+        class Item:  # real files differing only in case cannot coexist on NTFS
+            def __init__(self, name):
+                self.name, self.stem, self.suffix = name, name[:-4], name[-4:]
+
+            def is_file(self):
+                return True
+
+        root = self.make()
+        items = [Item("human-x.TXT"), Item("human-x.txt"), Item("ai-b.txt")]
+        with mock.patch.object(ev.Path, "iterdir", return_value=items):
+            c = ev.classify_folder(root)
+        self.assertEqual(c.human, ["human-x"])
+        self.assertEqual(c.files["human-x"], "human-x.TXT")
+        self.assertEqual(c.unclassified, ["human-x.txt"])
+        self.assertEqual(c.duplicates, {"human-x.txt": "human-x.TXT"})
+
     def test_empty_and_missing_folder(self):
         root = self.make()
         for folder in (root, root / "nope"):
@@ -451,6 +468,42 @@ class RunCheckTest(unittest.TestCase):
         self.assertTrue(failed)
         self.line_with(report, "false alarm", "human-a")
         self.assertNotIn("ignored:", report)
+
+    def test_gather_hands_the_real_file_name_to_the_analyzer(self):
+        root, analyzer = self.build({"human-a": (5, 200), "ai-b": (60, 300)})
+        folder = root / "evals" / "samples"
+        (folder / "human-a.txt").rename(folder / "human-a.TXT")
+        seen = []
+        real = ev.analyze_sample
+
+        def spy(analyzer_path, sample_path):
+            seen.append(Path(sample_path).name)
+            return real(analyzer_path, sample_path)
+
+        with mock.patch.object(ev, "analyze_sample", side_effect=spy):
+            ev._gather(root, analyzer)
+        self.assertEqual(sorted(seen), ["ai-b.txt", "human-a.TXT"])
+
+    def test_collision_is_reported_with_its_own_reason(self):
+        root, analyzer = self.build({"human-a": (5, 200), "ai-b": (60, 300)})
+        classified = ev.Classified(
+            ["human-a"], ["ai-b"], ["human-a.txt"], [], 3,
+            {"human-a": "human-a.TXT", "ai-b": "ai-b.txt"}, {"human-a.txt": "human-a.TXT"})
+        with mock.patch.object(ev, "classify_folder", return_value=classified):
+            with mock.patch.object(ev, "analyze_sample",
+                                   return_value=(ev.Analysis(5, 200, "x"), "")):
+                errors = ev._gather(root, analyzer)[3]
+        reasons = [e.reason for e in errors if e.kind == "eval.unclassified_sample"]
+        self.assertEqual(len(reasons), 1)
+        self.assertIn("same sample name as human-a.TXT in another letter case", reasons[0])
+
+    def test_ignored_items_do_not_change_a_passing_run(self):
+        report, failed = self.run_check(
+            {"human-a": (5, 200), "ai-b": (60, 300)},
+            extra_files=["readme.md"], extra_dirs=["sub"])
+        self.assertFalse(failed)
+        self.assertIn("result: passed", report)
+        self.line_with(report, "ignored:", "readme.md", "sub")
 
     def test_missing_category_fails(self):
         report, failed = self.run_check({"ai-b": (60, 300)})
