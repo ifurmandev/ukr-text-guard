@@ -450,8 +450,8 @@ Each top-3 goal from §1 expanded into a full scenario. Numbers come verbatim fr
 | Reliability | The analyzer's own rating of how far the index can be trusted for a text of that length |
 | Sample | One text file in the check set, labelled human or AI by its file name prefix |
 | Text author | The person who installs the plugins and checks or edits their own Ukrainian texts |
-| Analyzer failure | A sample whose analyzer run crashed, timed out, returned an empty, unreadable or incomplete result, or returned an index outside 0 to 100; counted as failed and never shown as a low index (not yet in CONTEXT.md) |
-| Detector copy | The `analyze.py` inside one plugin; three byte-identical copies exist and each run measures one (not yet in CONTEXT.md) |
-| Unclassified sample | A plain text file in the sample folder whose name starts with neither `human-` nor `ai-`; reported and fails the run (not yet in CONTEXT.md) |
-| Inconclusive | The mark on the human conclusion when fewer than all human samples reach 150 words (not yet in CONTEXT.md) |
-| Drift warning | A note that a human sample is above 15 but within the human band of 25; never changes the outcome (not yet in CONTEXT.md) |
+| Analyzer failure | A sample whose analyzer run crashed, timed out, returned an empty, unreadable or incomplete result, or returned an index outside 0 to 100; counted as failed and never shown as a low index |
+| Detector copy | The `analyze.py` inside one plugin; three byte-identical copies exist and each run measures one |
+| Unclassified sample | A plain text file in the sample folder whose name starts with neither `human-` nor `ai-`; reported and fails the run |
+| Inconclusive | The mark on the human conclusion when fewer than all human samples reach 150 words |
+| Drift warning | A note that a human sample is above 15 but within the human band of 25; never changes the outcome |

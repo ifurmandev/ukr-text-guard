@@ -47,7 +47,7 @@ This task delivers the explicit, validated list that is the only way a sample ge
 >
 > — `sad.md §6, «Flagged for spec and ADR-0001», verbatim` · full text: [sad.md](../sad.md)
 
-Seed `evals/known-gaps.txt` with `ai-prompted-human-style` as the sad decides; the spec and ADR text are stale on this point (source disagreement noted in the epic). Failure kind: `eval.bad_known_gap` ([cli.md](../contracts/cli.md) §6). OQ-B (missing file = empty list) is a proposal in the contract; apply it as written.
+Seed `evals/known-gaps.txt` with `ai-prompted-human-style` as the sad decides; spec §1 and ADR-0001 now agree (resolved in the review fix pass, 2026-10-03). Failure kind: `eval.bad_known_gap` ([cli.md](../contracts/cli.md) §6). OQ-B (missing file = empty list) is a proposal in the contract; apply it as written.
 
 **Fallback:** insufficient or contradicted by the code → read [adr/0001](../adr/0001-keep-known-gaps-in-a-plain-list-file.md), [sad.md](../sad.md) §6 and [cli.md](../contracts/cli.md) §3 in full. Do not guess.
 
