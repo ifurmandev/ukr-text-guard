@@ -19,7 +19,7 @@ The plugin author and Ukrainian-language writers can see from a measured eval ho
 
 | # | Step | Source | Size | Status |
 |---|---|---|:---:|---|
-| 1 | Run the eval against expected score ranges fixed before the run, and get a pass/fail report that lists false alarms on human texts and keeps bypass samples as known-gap | `idea-brief.md` §7 Recommendation | S | idea |
+| 1 | Run the eval against expected score ranges fixed before the run, and get a pass/fail report that lists false alarms on human texts and keeps bypass samples as known-gap → [spec](features/ukr-text-eval/spec.md) | `idea-brief.md` §7 Recommendation | S | spec'd |
 | 2 | Show the eval table in the README with expected ranges and known-gap status, so users see measured quality | `idea-brief.md` §7 Recommendation | XS | idea |
 | 3 | Broaden the human sample set across genres and authors, to reduce the one-voice risk | `idea-brief.md` §6 Risks | S | idea |
 | 4 | Keep one reference copy of the shared detector files, copy it into each plugin by script, and fail the check when copies diverge | `idea-brief.md` §7 Recommendation | S | idea |
@@ -48,6 +48,7 @@ Nothing: every step could be stated precisely at this pass. Open questions are i
 ## Decisions so far
 
 - Expected ranges are set before looking at detector output, so the eval tests the detector instead of mirroring it → [`idea-brief.md`](idea-brief.md) §6 Risks
+- Exact equality of plugin copies is proven by step 4's own divergence check, while the eval checks only that the bands hold on each copy → [`spec.md`](features/ukr-text-eval/spec.md) §3 Non-goals
 - Shared files are kept as one source plus a sync script, with a check that fails on divergence, because each installed plugin is a copy of its own folder → [`architecture-map.md`](architecture-map.md) Constraints
 - Plugins can ship hooks (`hooks/hooks.json`) and reach their own files through `${CLAUDE_PLUGIN_ROOT}`; files outside the plugin folder are not reachable → [`plugins reference`](https://code.claude.com/docs/en/plugins-reference)
 - A hook can read the reply text from the Stop event and show a non-blocking message; the alternative is the Write/Edit event with the file path → [`hooks reference`](https://code.claude.com/docs/en/hooks)
@@ -58,7 +59,7 @@ Nothing: every step could be stated precisely at this pass. Open questions are i
 flowchart LR
   s1["1 · Eval with expected ranges"] -->|README table shows the ranges the eval defines| s2["2 · Eval table in README"]
   s1 -->|new samples must fit the eval range format| s3["3 · Broader human set"]
-  s1 -->|eval proves scores did not change after the sync| s4["4 · Shared source and sync check"]
+  s1 -->|eval confirms the bands still hold on every copy after the sync| s4["4 · Shared source and sync check"]
   s1 -->|hook thresholds come from eval results| s5["5 · Quiet hook off by default"]
   s4 -->|hook script and detector copies must ship through the synced source| s5
 ```
