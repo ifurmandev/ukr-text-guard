@@ -15,6 +15,6 @@
 
 ## Known limitations
 
-- Covered genres: fiction (two stories by classics who died before 1916) and legal documents (the opening of the 1996 Constitution of Ukraine). Not covered: business letters and mail, articles and blogs, modern informal prose and informal style. The set holds classic and official texts only, so it does not show the detector safe for other kinds of modern text.
+- Covered genres: fiction (two stories by classics who died in 1913 and 1916) and legal documents (the opening of the 1996 Constitution of Ukraine). Not covered: business letters and mail, articles and blogs, modern informal prose and informal style. The set holds classic and official texts only, so it does not show the detector safe for other kinds of modern text.
 - `human-verkhovna-rada-konstytutsiia` has index 19, above the drift mark of 15 and within the human band of 25.
 - No text by the plugin author is in the set yet: the first batch had no candidate with a dated original and no third-party personal data (recorded in the register).
