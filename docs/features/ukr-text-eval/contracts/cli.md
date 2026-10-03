@@ -39,7 +39,7 @@ An invalid command line (unknown option, missing value) prints usage and exits 1
 
 | Input | Location under the root | Rule | Source |
 |---|---|---|---|
-| Samples | `evals/samples/` | Plain `*.txt` files directly in the folder. `human-` prefix is human, `ai-` prefix is AI, any other plain text file, and any file whose extension is `.txt` in another letter case (such as `.TXT`), is unclassified. Non-text files and subfolder contents are ignored | AC-12, AC-17 |
+| Samples | `evals/samples/` | Plain `*.txt` files directly in the folder, the extension in any letter case (`.TXT` counts). `human-` prefix is human, `ai-` prefix is AI, any other plain text file is unclassified. Non-text files and subfolder contents are ignored | AC-12, AC-17 |
 | Known-gap list | `evals/known-gaps.txt` | One AI sample name (file name without `.txt`) per line, optional `# reason`. A name that does not exist, or names a human sample, is an error. A missing file is treated as an empty list (OQ-B) | AC-13, AC-14, ADR-0001 |
 | Detector copy | `plugins/<NAME>/skills/<NAME>/scripts/analyze.py` | Started as `sys.executable analyze.py FILE --json` in a fresh process with `PYTHONUTF8=1` and a 10 s limit | AC-09, AC-10, sad §2 |
 
@@ -76,7 +76,7 @@ There is no error registry in the repo, so these names are this contract's propo
 | `eval.analyzer_failure` | crash, timeout, empty, unreadable or incomplete result, index outside 0 to 100; the reason is in the line | AC-09 |
 | `eval.false_alarm` | human sample above 25 | AC-03 |
 | `eval.miss` | ordinary AI sample below 26 | AC-05 |
-| `eval.unclassified_sample` | plain text file with neither prefix, or a `.txt` extension in the wrong case | AC-12 |
+| `eval.unclassified_sample` | plain text file with neither prefix (reported by its file name) | AC-12 |
 | `eval.bad_known_gap` | entry names a missing sample or a human sample | AC-13, AC-14 |
 | `eval.missing_category` | no samples, no human samples or no AI samples | AC-15 |
 | `eval.missing_detector_copy` | the named plugin has no `analyze.py` | AC-18 |

@@ -35,7 +35,7 @@ This task delivers the folder scan that sorts every item into human, AI, unclass
 >
 > — `sad.md §6, «Flow: validate and classify the sample folder», abridged` · full text: [sad.md](../sad.md)
 
-> **Inputs, Samples:** `evals/samples/` — plain `*.txt` files directly in the folder. `human-` prefix is human, `ai-` prefix is AI, any other plain text file is unclassified. Non-text files and subfolder contents are ignored.
+> **Inputs, Samples:** `evals/samples/` — plain `*.txt` files directly in the folder, the extension in any letter case. `human-` prefix is human, `ai-` prefix is AI, any other plain text file is unclassified. Non-text files and subfolder contents are ignored.
 >
 > — `contracts/cli.md §3, Samples, verbatim` · full text: [cli.md](../contracts/cli.md)
 

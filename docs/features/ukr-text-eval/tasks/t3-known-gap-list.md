@@ -43,7 +43,7 @@ This task delivers the explicit, validated list that is the only way a sample ge
 >
 > — `contracts/cli.md §3, Known-gap list, verbatim` · full text: [cli.md](../contracts/cli.md)
 
-> **Flagged during `sequences`:** the first known-gap list holds only `ai-prompted-human-style` (index 9). `ai-engineered-humanity` (index 29) already reaches the AI band of 26, so it is an ordinary AI sample and not a known-gap. Spec §1 and ADR-0001 (Consequences) still say the first run flags both samples. The flows are unaffected, because a known-gap sample at 26 or above still gets the gap-may-be-closed warning.
+> **Flagged during `sequences`:** the first known-gap list holds only `ai-prompted-human-style` (index 9). `ai-engineered-humanity` (index 29) already reaches the AI band of 26, so it is an ordinary AI sample and not a known-gap. Spec §1 and ADR-0001 (Consequences) said the first run flags both samples; resolved in the review fix pass (2026-10-03), they now name one. The flows are unaffected, because a known-gap sample at 26 or above still gets the gap-may-be-closed warning.
 >
 > — `sad.md §6, «Flagged for spec and ADR-0001», verbatim` · full text: [sad.md](../sad.md)
 

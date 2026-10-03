@@ -35,7 +35,7 @@ This task delivers the command line: choosing the plugin, finding its detector c
 >
 > — `contracts/cli.md §1–§2, abridged` · full text: [cli.md](../contracts/cli.md)
 
-> **Exit codes:** `0` nothing failed (notes and warnings may be present) · `1` anything else: analyzer failure, false alarm, miss, unclassified item, bad known-gap entry, missing category, missing detector copy, invalid command line, unhandled runner error (printed as «runner error»). Only 0 and 1 are used.
+> **Exit codes:** `0` nothing failed (notes and warnings may be present) · `1` anything else: analyzer failure, false alarm, miss, unclassified item, bad known-gap entry, missing category, missing detector copy, invalid command line, unhandled runner error (printed as `error eval.runner_error` followed by `result: failed`). Only 0 and 1 are used.
 >
 > — `contracts/cli.md §5, abridged` · full text: [cli.md](../contracts/cli.md)
 
@@ -43,7 +43,7 @@ This task delivers the command line: choosing the plugin, finding its detector c
 >
 > — `adr/0002, Decision outcome, abridged` · full text: [adr/](../adr/0002-signal-the-outcome-by-exit-code-only.md)
 
-> **Flow: critical flow 1.** Resolve the detector copy of the chosen plugin. If that plugin has no detector copy → report that no copy exists and exit 1. Otherwise run the check, print the report, exit 0 if nothing failed, otherwise exit 1. Unhandled error inside the service → print «runner error», exit 1.
+> **Flow: critical flow 1.** Resolve the detector copy of the chosen plugin. If that plugin has no detector copy → report that no copy exists and exit 1. Otherwise run the check, print the report, exit 0 if nothing failed, otherwise exit 1. Unhandled error inside the service → print `error eval.runner_error: …` and `result: failed`, exit 1.
 >
 > — `sad.md §6, «Critical flow 1» and «Flow: summarise the evidence and signal the outcome», abridged` · full text: [sad.md](../sad.md)
 
@@ -100,7 +100,7 @@ No DB changes.
 
 - [ ] Add `resolve_detector(root, plugin)` returning the path of `plugins/<plugin>/skills/<plugin>/scripts/analyze.py` or `None`, in `evals/run_eval.py`.
 - [ ] Add `main(argv)` with `--plugin`, `--root`, `--help`; invalid command line prints usage and returns 1.
-- [ ] Reconfigure stdout to UTF-8 with `errors="replace"`, print the report, return 0 or 1; wrap the whole run so any unhandled exception prints «runner error: …» and returns 1.
+- [ ] Reconfigure stdout to UTF-8 with `errors="replace"`, print the report, return 0 or 1; wrap the whole run so any unhandled exception prints `error eval.runner_error: runner error: …` and `result: failed`, and returns 1.
 - [ ] `if __name__ == "__main__": sys.exit(main(sys.argv[1:]))`.
 - [ ] Tests in `evals/tests/test_run_eval.py` in a temporary repo root with a fake analyzer: default plugin named in the header, `--plugin` choosing another copy, missing copy, bad option, forced exception, exit codes 0 and 1.
 
@@ -112,7 +112,7 @@ No DB changes.
 | No `--plugin` | header names `ukr-text-guard` |
 | `--plugin` without a value, or `--bogus` | usage printed, exit 1 (not 2) |
 | `--help` | usage printed, exit 0 |
-| Exception inside the run | «runner error» line, exit 1, never exit 0 |
+| Exception inside the run | `error eval.runner_error` line and `result: failed`, exit 1, never exit 0 |
 | One copy fails, another passes | each run's code reflects only its own copy |
 | `--root` pointing to a folder without `plugins/` | treated as a missing detector copy |
 
