@@ -112,20 +112,22 @@ class ClassifyFolderTest(unittest.TestCase):
         c = ev.classify_folder(root)
         self.assertEqual(c.human, ["human-a", "human-b"])
         self.assertEqual(c.ai, ["ai-y", "ai-z"])
-        self.assertEqual(c.unclassified, ["Human-x", "notes"])
+        self.assertEqual(c.unclassified, ["Human-x.txt", "notes.txt"])
         self.assertEqual(c.ignored, ["ai-y.png", "human-x.md", "sub"])
         self.assertEqual(c.total, 9)  # the file inside sub/ is not a separate item
         self.assertEqual(
             len(c.human) + len(c.ai) + len(c.unclassified) + len(c.ignored), c.total
         )
 
-    def test_upper_case_extension_is_unclassified_not_ignored(self):
-        root = self.make(files=["human-a.txt", "ai-b.txt", "human-x.TXT", "ai-y.Txt"])
+    def test_extension_in_any_letter_case_is_judged_by_prefix(self):
+        root = self.make(files=["human-a.txt", "ai-b.txt", "human-x.TXT", "ai-y.Txt", "notes.TXT"])
         c = ev.classify_folder(root)
-        self.assertEqual(c.human, ["human-a"])
-        self.assertEqual(c.ai, ["ai-b"])
-        self.assertEqual(c.unclassified, ["ai-y.Txt", "human-x.TXT"])
+        self.assertEqual(c.human, ["human-a", "human-x"])
+        self.assertEqual(c.ai, ["ai-b", "ai-y"])
+        self.assertEqual(c.unclassified, ["notes.TXT"])
         self.assertEqual(c.ignored, [])
+        self.assertEqual(c.files["human-x"], "human-x.TXT")
+        self.assertEqual(c.files["ai-b"], "ai-b.txt")
 
     def test_empty_and_missing_folder(self):
         root = self.make()
@@ -441,6 +443,15 @@ class RunCheckTest(unittest.TestCase):
         self.line_with(report, "summary", "1 human", "1 AI", "1 unclassified",
                        "2 ignored", "5 of 5")
 
+    def test_upper_case_extension_sample_is_judged_not_skipped(self):
+        root, analyzer = self.build({"human-a": (40, 200), "ai-b": (60, 300)})
+        folder = root / "evals" / "samples"
+        (folder / "human-a.txt").rename(folder / "human-a.TXT")
+        report, failed = ev.run_check(root, analyzer, "ukr-text-guard")
+        self.assertTrue(failed)
+        self.line_with(report, "false alarm", "human-a")
+        self.assertNotIn("ignored:", report)
+
     def test_missing_category_fails(self):
         report, failed = self.run_check({"ai-b": (60, 300)})
         self.assertTrue(failed)
@@ -597,6 +608,29 @@ def compare_orders(analyze, analyzer, samples):
     return [name for name in first if not all(other[name] == first[name] for other in passes)]
 
 
+def compare_alone_to_joint(gather, joint_root, analyzer, samples):
+    """Result of each sample run alone (a folder holding only it) against its row in the joint run.
+
+    Returns the names whose (outcome, verdict) differ.
+    """
+    def rows(root):
+        return {r.name: (r.outcome, r.verdict) for r in gather(root, analyzer)[-1]}
+
+    joint = rows(joint_root)
+    differing = []
+    for sample in samples:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "evals" / "samples"
+            folder.mkdir(parents=True)
+            (folder / sample.name).write_bytes(sample.read_bytes())
+            gaps = joint_root / "evals" / "known-gaps.txt"
+            if gaps.is_file():
+                (Path(tmp) / "evals" / "known-gaps.txt").write_bytes(gaps.read_bytes())
+            if rows(Path(tmp)).get(sample.stem) != joint.get(sample.stem):
+                differing.append(sample.stem)
+    return differing
+
+
 class OrderComparisonSelfTest(unittest.TestCase):
     """The comparison must be able to fail, or the real-analyzer test below proves nothing."""
 
@@ -610,6 +644,23 @@ class OrderComparisonSelfTest(unittest.TestCase):
         samples = [Path("human-a.txt"), Path("ai-b.txt")]
         self.assertEqual(sorted(compare_orders(stateful, None, samples)),
                          ["ai-b", "human-a"])
+
+    def test_alone_comparison_detects_a_result_that_depends_on_other_samples(self):
+        def crowd_aware(root, _analyzer):
+            count = len(list((Path(root) / "evals" / "samples").glob("*.txt")))
+            row = ev.Row("human-a", "human", False, ev.Analysis(count, 100, "x"),
+                         ev.Verdict(True, None, None, False), "")
+            return (None, [], set(), [], [row])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "evals" / "samples"
+            folder.mkdir(parents=True)
+            samples = []
+            for name in ("human-a.txt", "ai-b.txt"):
+                (folder / name).write_text("x", encoding="utf-8")
+                samples.append(folder / name)
+            self.assertEqual(
+                compare_alone_to_joint(crowd_aware, Path(tmp), None, samples[:1]), ["human-a"])
 
     def test_stable_analyzer_gives_no_difference(self):
         def stable(_analyzer, sample):
@@ -626,6 +677,11 @@ class RealAnalyzerTest(unittest.TestCase):
         self.assertTrue(samples, "no real samples found")
         differing = compare_orders(ev.analyze_sample, REAL_ANALYZER, samples)
         self.assertEqual(differing, [], "results differ between runs for: %s" % differing)
+
+    def test_every_real_sample_alone_matches_its_row_in_the_joint_run(self):
+        samples = sorted((REPO / "evals" / "samples").glob("*.txt"))
+        differing = compare_alone_to_joint(ev._gather, REPO, REAL_ANALYZER, samples)
+        self.assertEqual(differing, [], "alone differs from joint for: %s" % differing)
 
     def test_two_real_reports_differ_only_in_the_duration_line(self):
         def stripped():

@@ -42,26 +42,31 @@ def judge(category, known_gap, outcome):
     return Verdict(True, None, None, index >= HIGH_LEVEL)
 
 
-Classified = namedtuple("Classified", "human ai unclassified ignored total")
+Classified = namedtuple("Classified", "human ai unclassified ignored total files", defaults=({},))
 
 
 def classify_folder(samples_dir):
-    """Розкладає елементи теки на human, ai, unclassified та ignored; усе відсортовано за назвою."""
-    human, ai, unclassified, ignored = [], [], [], []
+    """Розкладає елементи теки на human, ai, unclassified та ignored; усе відсортовано за назвою.
+
+    Розширення .txt береться в будь-якому регістрі; files дає справжню назву файлу за назвою зразка.
+    """
+    human, ai, unclassified, ignored, files = [], [], [], [], {}
     samples_dir = Path(samples_dir)
     items = sorted(samples_dir.iterdir(), key=lambda p: p.name) if samples_dir.is_dir() else []
     for item in items:
         if not item.is_file() or item.suffix.lower() != ".txt":
             ignored.append(item.name)
-        elif item.suffix != ".txt":
-            unclassified.append(item.name)  # .TXT and the like: reported, never skipped
+        elif item.stem in files:
+            unclassified.append(item.name)  # той самий зразок у двох регістрах розширення
         elif item.stem.startswith("human-"):
             human.append(item.stem)
+            files[item.stem] = item.name
         elif item.stem.startswith("ai-"):
             ai.append(item.stem)
+            files[item.stem] = item.name
         else:
-            unclassified.append(item.stem)
-    return Classified(human, ai, unclassified, ignored, len(items))
+            unclassified.append(item.name)
+    return Classified(human, ai, unclassified, ignored, len(items), files)
 
 
 def missing_categories(classified):
@@ -195,7 +200,7 @@ def _gather(root, analyzer_path):
     rows = []
     for name, category in names:
         outcome, hidden = analyze_sample(
-            analyzer_path, root / "evals" / "samples" / (name + ".txt"))
+            analyzer_path, root / "evals" / "samples" / classified.files[name])
         known_gap = name in flagged
         rows.append(Row(name, category, known_gap, outcome,
                         judge(category, known_gap, outcome), hidden))
