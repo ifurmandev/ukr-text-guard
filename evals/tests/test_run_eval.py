@@ -1,7 +1,9 @@
+import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -180,6 +182,108 @@ class KnownGapTest(unittest.TestCase):
         entries = ev.read_known_gaps(repo / "evals" / "known-gaps.txt")
         self.assertEqual([n for n, _ in entries], ["ai-prompted-human-style"])
         self.assertTrue((repo / "evals" / "samples" / "ai-prompted-human-style.txt").exists())
+
+FAKE_HEADER = """import json, sys, time
+path = sys.argv[1]
+
+
+def ok(index=10, words=100, reliability="low"):
+    print(json.dumps({"індекс": index, "надійність_статистики": reliability,
+                      "метрики": {"слів": words}}))
+
+
+"""
+
+
+class AnalyzeSampleTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+        self.sample = self.dir / "human-x.txt"
+        self.sample.write_text("Привіт, світе.", encoding="utf-8")
+        self.analyzer = self.dir / "analyze.py"
+
+    def run_fake(self, body):
+        self.analyzer.write_text(FAKE_HEADER + body + "\n", encoding="utf-8")
+        return ev.analyze_sample(self.analyzer, self.sample)
+
+    def assert_failure(self, body, reason):
+        outcome, _hidden = self.run_fake(body)
+        self.assertIsInstance(outcome, ev.Failure)
+        self.assertIn(reason, outcome.reason)
+
+    def test_usable_result(self):
+        outcome, hidden = self.run_fake('ok(index=37, words=212, reliability="high")')
+        self.assertEqual(outcome, ev.Analysis(37, 212, "high"))
+        self.assertFalse(hidden)
+
+    def test_index_bounds_accepted(self):
+        for index in (0, 100):
+            with self.subTest(index=index):
+                outcome, _ = self.run_fake("ok(index=%d)" % index)
+                self.assertEqual(outcome.index, index)
+
+    def test_index_out_of_range(self):
+        for index in (101, -1):
+            with self.subTest(index=index):
+                self.assert_failure("ok(index=%d)" % index, "index out of range")
+
+    def test_crash_names_exit_code_and_last_stderr_line(self):
+        outcome, _ = self.run_fake('sys.stderr.write("first\\nlast line\\n"); sys.exit(3)')
+        self.assertIsInstance(outcome, ev.Failure)
+        self.assertIn("crashed", outcome.reason)
+        self.assertIn("3", outcome.reason)
+        self.assertIn("last line", outcome.reason)
+
+    def test_timeout(self):
+        with mock.patch.object(ev, "SAMPLE_TIMEOUT_S", 1):
+            self.assert_failure("time.sleep(30)", "timed out")
+
+    def test_empty_output(self):
+        self.assert_failure("pass", "empty result")
+
+    def test_not_json(self):
+        self.assert_failure('print("not json")', "unreadable result")
+
+    def test_json_but_not_an_object(self):
+        self.assert_failure("print([1, 2])", "unreadable result")
+
+    def test_missing_keys(self):
+        self.assert_failure("print({})", "incomplete result")
+        self.assert_failure('print(json.dumps({"індекс": 5}))', "incomplete result")
+
+    def test_values_of_wrong_type_are_not_coerced(self):
+        for value in ('"12"', "True", "12.5"):
+            with self.subTest(index=value):
+                self.assert_failure("ok(index=%s)" % value, "unreadable result")
+
+    def test_empty_reliability(self):
+        self.assert_failure('ok(reliability="")', "incomplete result")
+
+    def test_two_calls_are_equal(self):
+        self.run_fake("ok(index=44)")
+        self.assertEqual(ev.analyze_sample(self.analyzer, self.sample),
+                         ev.analyze_sample(self.analyzer, self.sample))
+
+    def test_hidden_characters_flag(self):
+        cases = {
+            "plain": (b"Hello", False),
+            "bom": (b"\xef\xbb\xbfHello", True),
+            "zero-width": ("Hel\u200blo".encode("utf-8"), True),
+        }
+        for name, (data, expected) in cases.items():
+            with self.subTest(name=name):
+                self.sample.write_bytes(data)
+                outcome, hidden = self.run_fake("ok()")
+                self.assertIsInstance(outcome, ev.Analysis)
+                self.assertEqual(hidden, expected)
+
+    def test_unreadable_sample_file_is_a_failure(self):
+        self.run_fake("ok()")
+        outcome, hidden = ev.analyze_sample(self.analyzer, self.dir / "gone.txt")
+        self.assertIsInstance(outcome, ev.Failure)
+        self.assertFalse(hidden)
 
 
 if __name__ == "__main__":

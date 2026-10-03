@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Перевірка детектора: прогін зразків через аналізатор і порівняння з очікуваними смугами."""
+import json
+import os
+import subprocess
+import sys
 from collections import namedtuple
 from pathlib import Path
 
@@ -95,3 +99,69 @@ def apply_known_gaps(entries, classified):
         else:
             errors.append(Error("eval.bad_known_gap", name, "no such sample"))
     return flagged, errors
+
+
+HIDDEN_CHARS = ("\ufeff", "\u200b", "\u200c", "\u200d", "\u2060")
+
+
+def _has_hidden_characters(data):
+    text = data.decode("utf-8", errors="replace")
+    return any(ch in text for ch in HIDDEN_CHARS)
+
+
+def _last_line(raw):
+    lines = [ln for ln in raw.decode("utf-8", errors="replace").splitlines() if ln.strip()]
+    return lines[-1].strip() if lines else ""
+
+
+def _parse_result(stdout):
+    """Розбирає JSON аналізатора: Analysis або Failure з причиною."""
+    text = stdout.decode("utf-8", errors="replace").strip()
+    if not text:
+        return Failure("empty result")
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return Failure("unreadable result")
+    if not isinstance(data, dict):
+        return Failure("unreadable result")
+    metrics = data.get("метрики")
+    index = data.get("індекс")
+    reliability = data.get("надійність_статистики")
+    words = metrics.get("слів") if isinstance(metrics, dict) else None
+    if index is None or reliability is None or words is None:
+        return Failure("incomplete result")
+    for number in (index, words):
+        if isinstance(number, bool) or not isinstance(number, int):
+            return Failure("unreadable result")
+    if not isinstance(reliability, str):
+        return Failure("unreadable result")
+    if not reliability.strip():
+        return Failure("incomplete result")
+    if not 0 <= index <= 100:
+        return Failure("index out of range: %d" % index)
+    return Analysis(index, words, reliability)
+
+
+def analyze_sample(analyzer_path, sample_path):
+    """Один зразок у свіжому процесі. Повертає (Analysis | Failure, є_приховані_символи)."""
+    try:
+        data = Path(sample_path).read_bytes()
+    except OSError as exc:
+        return Failure("unreadable sample file: %s" % exc), False
+    hidden = _has_hidden_characters(data)
+    env = dict(os.environ, PYTHONUTF8="1")
+    try:
+        done = subprocess.run(
+            [sys.executable, str(analyzer_path), str(sample_path), "--json"],
+            env=env, capture_output=True, timeout=SAMPLE_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return Failure("timed out after %s s" % SAMPLE_TIMEOUT_S), hidden
+    except OSError as exc:
+        return Failure("crashed: could not start the analyzer: %s" % exc), hidden
+    if done.returncode != 0:
+        detail = _last_line(done.stderr)
+        reason = "crashed: exit code %d" % done.returncode
+        return Failure(reason + (", " + detail if detail else "")), hidden
+    return _parse_result(done.stdout), hidden
