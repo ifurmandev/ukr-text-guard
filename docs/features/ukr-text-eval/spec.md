@@ -234,6 +234,6 @@ Sources: `docs/idea-brief.md` §5–§7, `docs/roadmap.md` step 1, and the analy
 
 ## 8. Open questions
 
-- [ ] Is 150 words the right threshold for a human sample to count as long enough, or should it be 300, where most detector rules switch on? Default now: 150 (the analyzer's own reliability boundary). — owner: plugin author, due: before `sdd:design`
+- [x] Is 150 words the right threshold for a human sample to count as long enough, or should it be 300, where most detector rules switch on? Default now: 150 (the analyzer's own reliability boundary). — owner: plugin author, due: before `sdd:design` — resolved in design (2026-10-03) at the default 150, kept as one named constant (`sad.md` §8 Configuration)
 - [ ] Where do human texts by other authors come from, and with whose permission? Default now: none are added in this step. — owner: plugin author, due: before the broader human set step
 - [ ] Should the known limitation about byte-order marks and invisible characters be printed in the report, or fixed in the analyzer in the next iteration? Default now: printed only for samples that contain such characters, saying that a high index may come from the file rather than the text, and not fixed. — owner: plugin author, due: before the next detector iteration

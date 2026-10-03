@@ -27,14 +27,14 @@ target_surfaces: [cli]
 | Text author | Indirect: the check fails whenever a human sample is labelled suspicious, so the detector is not shipped with false accusations of people | No |
 | Tech Lead | SAD approval | Yes |
 
-<!-- Decision overrides (¶4) — none. -->
+- **Decision override:** the runner starts the analyzer with `sys.executable` and `PYTHONUTF8=1`, unlike the repo's documented invocation `python3 scripts/analyze.py FILE` with no environment variables — rationale: on the author's Windows machine `python3` is a non-working Microsoft Store stub, and piped analyzer output is otherwise in the console encoding, so every sample would fail to decode (verified 2026-10-03). The documented invocation stays valid for plugin users; the departure applies to the eval tool only.
 
 ## 2. Constraints
 
 **Technical.**
 - Python 3, standard library only, as the rest of the repo; the repo pins no minimum version and the author's machine runs 3.12.10, so the runner avoids version-specific syntax.
 - Runs in a Windows shell (PowerShell or cmd) and in a POSIX-compatible shell (Git Bash) with identical verdicts (spec §6 Platforms). On the author's Windows machine `python3` is a Microsoft Store stub that does not run, while `python` works.
-- The analyzer is a black box with a fixed CLI: `analyze.py <file> --json` prints a JSON object with Ukrainian keys `індекс`, `надійність_статистики` and `метрики.слів` (`plugins/ukr-text-guard/skills/ukr-text-guard/scripts/analyze.py:513`). Three byte-identical copies exist, one per plugin. The runner may not change them.
+- The analyzer is a black box with a fixed CLI: `analyze.py FILE --json` prints a JSON object with Ukrainian keys `індекс`, `надійність_статистики` and `метрики.слів` (`plugins/ukr-text-guard/skills/ukr-text-guard/scripts/analyze.py:513`). Three byte-identical copies exist, one per plugin. The runner may not change them.
 - No datastore, no network, no accounts; the inputs are text files on disk.
 - Without `PYTHONUTF8=1` the analyzer prints its JSON in the local console encoding when piped on Windows, so the runner must force UTF-8.
 
@@ -87,7 +87,7 @@ C4Context
 
 **Top strategic choices (the seeds for ADRs):**
 
-1. **Judge every sample in isolation and fail closed** — the runner starts a fresh analyzer process per sample, one after another, with a 10 s limit and UTF-8 forced on both ends. A crash, a timeout, an empty or unreadable result, or a missing field is an analyzer failure with a reason, never a low index (AC-09). Separate processes also keep the analyzer's module-level state from leaking between samples (AC-10) and give a hard timeout, which an in-process call cannot. Importing `analyze()` directly is excluded by AC-09 and AC-10, so this is not an ADR.
+1. **Judge every sample in isolation and fail closed** — the runner starts a fresh analyzer process per sample, one after another, with a 10 s limit and UTF-8 forced on both ends. A crash, a timeout, an empty or unreadable result, a missing field, or an index outside 0 to 100 is an analyzer failure with a reason, never a low index (AC-09). Separate processes also keep the analyzer's module-level state from leaking between samples (AC-10) and give a hard timeout, which an in-process call cannot. Importing `analyze()` directly is excluded by AC-09 and AC-10, so this is not an ADR.
 2. **Fix the bands before the run, take the category from the file name, excuse only by explicit entry** — bands are named constants in the runner, a sample is human or AI by its `human-` or `ai-` prefix, and a known-gap is a line in `evals/known-gaps.txt` that can name only an existing AI sample → [ADR-0001](adr/0001-keep-known-gaps-in-a-plain-list-file.md).
 3. **Report for people, exit code for machines** — the report is plain text on stdout, and the outcome is exit code 0 or 1 only; notes (drift warning, gap may be closed, inconclusive) never change it (AC-19). A crash of the runner itself also exits 1 → [ADR-0002](adr/0002-signal-the-outcome-by-exit-code-only.md).
 4. **Keep the judging core pure and separate from I/O** — one function takes a category, a known-gap flag and an analyzer result and returns a verdict. It is tested without any process, and the process-spawning part is tested against a fake analyzer in a temporary repo root (`--root` is the seam).
@@ -168,7 +168,7 @@ sequenceDiagram
             alt usable result
                 Analyzer-->>Runner: index, word count and reliability
                 Runner->>Runner: judge against the band, apply the known-gap flag
-            else crash, timeout, empty or invalid result
+            else crash, timeout, empty, unreadable, incomplete or out-of-range result
                 Analyzer-->>Runner: nothing usable
                 Runner->>Runner: record an analyzer failure with its reason
             end
@@ -192,11 +192,11 @@ The runner runs on the author's machine only. Its run time is printed in the rep
 | Concept | Convention | Where defined |
 |---|---|---|
 | Logging | None. The stdout report is the only output; no log files | here |
-| Error handling | Every failure kind (analyzer failure, unclassified item, bad known-gap entry, missing category, missing detector copy, miss, false alarm) is a report line naming the sample and the reason and makes the run fail. An unhandled exception in the runner is caught at the top level, printed as «runner error» and exits 1. Nothing ends in exit 0 except an explicit success | here, ADR-0002 |
+| Error handling | Every failure kind (analyzer failure — crash, timeout, empty, unreadable or incomplete result, index outside 0 to 100 — unclassified item, bad known-gap entry, missing category, missing detector copy, miss, false alarm) is a report line naming the sample and the reason and makes the run fail. An unhandled exception in the runner is caught at the top level, printed as «runner error» and exits 1. Nothing ends in exit 0 except an explicit success | here, ADR-0002 |
 | Exit code | 0 = nothing failed, 1 = anything else. Warnings, drift notes, gap-may-be-closed and the inconclusive mark are notes and never change it (AC-19) | ADR-0002 |
 | Encoding | The child gets `PYTHONUTF8=1` and its stdout is decoded as UTF-8 bytes. The runner's own stdout is reconfigured to UTF-8 with `errors="replace"`. Sample files are read as bytes, decoded as UTF-8 with replacement (as the analyzer does), and scanned for a byte-order mark or invisible characters, for which a note says a high index may come from the file rather than the text (spec §8 OQ-3 default) | here |
-| Configuration | `--plugin NAME`, default `ukr-text-guard`. `--root DIR`, default the repo root derived from the script's own location, exists as the test seam. Bands and limits are named constants in `run_eval.py`: human max 25, human drift warning above 15, AI min 26, informational high level 51, reliable length 150 words, 10 s per sample | here, ADR-0001 |
-| Determinism | Samples are processed in sorted name order, with no randomness and no timestamps in the report except the duration line | here |
+| Configuration | `--plugin NAME`, default `ukr-text-guard`. `--root DIR`, default the repo root derived from the script's own location, exists as the test seam. Bands and limits are named constants in `run_eval.py`: human max 25, human drift warning above 15, AI min 26, informational high level 51, reliable length 150 words, 10 s per sample. Spec §8 OQ-1 (150 or 300 words) is resolved in design at the default 150, the analyzer's own reliability boundary, as one named constant that a later change edits in one line | here, ADR-0001 |
+| Determinism | Samples are processed in sorted name order, with no randomness and no timestamps in the report except the duration line. The per-sample path is an importable function, so the independence check of spec §6 runs against the real analyzer copy and the real samples in three orders (alone, together, reverse); the CLI has no order flag | here |
 | Portability | Paths via `pathlib`, the child is started with an argument list and no shell, the interpreter is `sys.executable` | here |
 | ID strategy | N/A — the sample's file name without `.txt` is its identifier | — |
 | Authentication | N/A — local run, no accounts | — |
@@ -211,16 +211,16 @@ The runner runs on the author's machine only. Its run time is printed in the rep
 | 0001 | Keep known-gaps in a plain list file | Accepted | §4 |
 | 0002 | Signal the outcome by exit code only | Accepted | §4 |
 
-ADR files live under `docs/features/ukr-text-eval/adr/NNNN-<title>.md`.
+ADR files live under `docs/features/ukr-text-eval/adr/NNNN-*.md`.
 
 ## 10. Quality requirements
 
-Each top-3 goal from §1 expanded into a full scenario. Numbers come verbatim from spec §6.
+Each top-3 goal from §1 expanded into a full scenario. Numbers come verbatim from spec §6, except the 150-word reliability boundary, which comes from spec §2, AC-08 and the KPI «Evidence disclosed».
 
 **QG-1. Verdict integrity**
 - **When:** the same samples are run twice in a row, alone, together with others and in reverse order, or an analyzer run hangs, crashes or returns an unusable result.
 - **Then:** two consecutive runs on the same inputs give identical indexes and verdicts, 100%; each sample's verdict is identical when it is run alone, together with the others, and in reverse order, 100%; a sample that gets no result within 10 s is reported as an analyzer failure and never as a low index.
-- **How verify:** a unit test calls the per-sample path in three orders and compares verdicts; a test uses a fake analyzer that sleeps past 10 s, one that crashes and one that prints nothing; a diff of two consecutive reports differs only in the duration line.
+- **How verify:** a unit test imports the runner and calls the per-sample function on the real samples and the real analyzer copy in three orders (alone, together, reverse), comparing verdicts — this is the «comparison of the three runs before release» of spec §6, without an order flag in the CLI; a test uses a fake analyzer that sleeps past 10 s, one that crashes and one that prints nothing; a diff of two consecutive reports differs only in the duration line.
 
 **QG-2. Honest evidence**
 - **When:** the sample folder holds classified samples, unclassified files, non-text files and subfolders, and the human samples are short.
@@ -263,7 +263,7 @@ Each top-3 goal from §1 expanded into a full scenario. Numbers come verbatim fr
 | Reliability | The analyzer's own rating of how far the index can be trusted for a text of that length |
 | Sample | One text file in the check set, labelled human or AI by its file name prefix |
 | Text author | The person who installs the plugins and checks or edits their own Ukrainian texts |
-| Analyzer failure | A sample whose analyzer run crashed, timed out, or returned an empty, unreadable or incomplete result; counted as failed and never shown as a low index (not yet in CONTEXT.md) |
+| Analyzer failure | A sample whose analyzer run crashed, timed out, returned an empty, unreadable or incomplete result, or returned an index outside 0 to 100; counted as failed and never shown as a low index (not yet in CONTEXT.md) |
 | Detector copy | The `analyze.py` inside one plugin; three byte-identical copies exist and each run measures one (not yet in CONTEXT.md) |
 | Unclassified sample | A plain text file in the sample folder whose name starts with neither `human-` nor `ai-`; reported and fails the run (not yet in CONTEXT.md) |
 | Inconclusive | The mark on the human conclusion when fewer than all human samples reach 150 words (not yet in CONTEXT.md) |
