@@ -19,7 +19,7 @@ The plugin author and Ukrainian-language writers can see from a measured eval ho
 
 | # | Step | Source | Size | Status |
 |---|---|---|:---:|---|
-| 1 | Run the eval against expected score ranges fixed before the run, and get a pass/fail report that lists false alarms on human texts and keeps bypass samples as known-gap → [spec](features/ukr-text-eval/spec.md) | `idea-brief.md` §7 Recommendation | S | spec'd |
+| 1 | Run the eval against expected score ranges fixed before the run, and get a pass/fail report that lists false alarms on human texts and keeps bypass samples as known-gap → [spec](features/ukr-text-eval/spec.md) | `idea-brief.md` §7 Recommendation | S | shipped |
 | 2 | Show the eval table in the README with expected ranges and known-gap status, so users see measured quality | `idea-brief.md` §7 Recommendation | XS | idea |
 | 3 | Broaden the human sample set across genres and authors, to reduce the one-voice risk | `idea-brief.md` §6 Risks | S | idea |
 | 4 | Keep one reference copy of the shared detector files, copy it into each plugin by script, and fail the check when copies diverge | `idea-brief.md` §7 Recommendation | S | idea |
@@ -76,3 +76,4 @@ flowchart LR
 
 | Step | Shipped | Link |
 |---|---|---|
+| 1 · Eval with expected ranges | 2026-10-03 | [changelog](features/ukr-text-eval/changelog.md) (PR pending) |
