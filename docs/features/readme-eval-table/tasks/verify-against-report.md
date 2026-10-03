@@ -9,7 +9,7 @@ files_hint: ["README.md", "CONTEXT.md"]
 owner: "Ihor Furman"
 estimate: "S"
 context_budget: "M"
-status: "review"
+status: "done"
 ---
 
 <!-- To the executing agent: work from what is inlined here. If a slice is insufficient, ambiguous,

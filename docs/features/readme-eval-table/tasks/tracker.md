@@ -9,6 +9,6 @@
 | T2 | Replace the README sample table with the eval table header and rows | docs | Ihor Furman | S | T1 | done |
 | T3 | Fill the result cells with the six-value mapping, known-gap and failed rows | docs | Ihor Furman | M | T2 | done |
 | T4 | Add the caption, the evidence note and the pointer to the honest-limit section | docs | Ihor Furman | S | T1 | done |
-| T5 | Compare the table with the report and prepare the pull request | docs | Ihor Furman | S | T3, T4 | review |
+| T5 | Compare the table with the report and prepare the pull request | docs | Ihor Furman | S | T3, T4 | done |
 
 **Total:** 5 tasks, ~1 person-day (one PR).
