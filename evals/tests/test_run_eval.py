@@ -1,4 +1,5 @@
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -85,6 +86,50 @@ class ConstantsTest(unittest.TestCase):
              ev.RELIABLE_WORDS, ev.SAMPLE_TIMEOUT_S, ev.DEFAULT_PLUGIN),
             (25, 15, 26, 51, 150, 10, "ukr-text-guard"),
         )
+
+class ClassifyFolderTest(unittest.TestCase):
+    def make(self, files=(), dirs=()):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        for name in files:
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("x", encoding="utf-8")
+        for name in dirs:
+            (root / name).mkdir(parents=True, exist_ok=True)
+        return root
+
+    def test_every_kind_of_item(self):
+        root = self.make(
+            files=["human-b.txt", "human-a.txt", "ai-z.txt", "ai-y.txt", "notes.txt",
+                   "Human-x.txt", "human-x.md", "ai-y.png", "sub/ai-inner.txt"],
+        )
+        c = ev.classify_folder(root)
+        self.assertEqual(c.human, ["human-a", "human-b"])
+        self.assertEqual(c.ai, ["ai-y", "ai-z"])
+        self.assertEqual(c.unclassified, ["Human-x", "notes"])
+        self.assertEqual(c.ignored, ["ai-y.png", "human-x.md", "sub"])
+        self.assertEqual(c.total, 9)  # the file inside sub/ is not a separate item
+        self.assertEqual(
+            len(c.human) + len(c.ai) + len(c.unclassified) + len(c.ignored), c.total
+        )
+
+    def test_empty_and_missing_folder(self):
+        root = self.make()
+        for folder in (root, root / "nope"):
+            with self.subTest(folder=folder.name):
+                c = ev.classify_folder(folder)
+                self.assertEqual(c.total, 0)
+                self.assertEqual(ev.missing_categories(c), ["samples"])
+
+    def test_missing_categories(self):
+        only_human = ev.classify_folder(self.make(files=["human-a.txt"]))
+        self.assertEqual(ev.missing_categories(only_human), ["ai"])
+        only_ai = ev.classify_folder(self.make(files=["ai-a.txt"]))
+        self.assertEqual(ev.missing_categories(only_ai), ["human"])
+        both = ev.classify_folder(self.make(files=["ai-a.txt", "human-a.txt"]))
+        self.assertEqual(ev.missing_categories(both), [])
 
 
 if __name__ == "__main__":
