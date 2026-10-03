@@ -77,4 +77,4 @@ flowchart LR
 | Step | Shipped | Link |
 |---|---|---|
 | 1 · Eval with expected ranges | 2026-10-03 | [changelog](features/ukr-text-eval/changelog.md) · [PR #1](https://github.com/ifurmandev/ukr-text-guard/pull/1) |
-| 2 · Eval table in README | 2026-10-03 | [changelog](features/readme-eval-table/changelog.md) |
+| 2 · Eval table in README | 2026-10-03 | [changelog](features/readme-eval-table/changelog.md) · [PR #2](https://github.com/ifurmandev/ukr-text-guard/pull/2) |
