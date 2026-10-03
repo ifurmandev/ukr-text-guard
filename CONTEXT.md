@@ -18,6 +18,7 @@ lives in spec.md.
 - Bypass sample — an AI text deliberately written or reworked to look human and avoid detection. NOT a known-gap: a bypass sample is a kind of text, while known-gap is the flag that excuses a sample the detector misses.
 - Detector copy — the `analyze.py` inside one plugin; three identical copies exist and each run measures one. NOT the detector as a whole.
 - Drift warning — a note that a human sample is above 15 but within the human band of 25; never changes the outcome. NOT a false alarm.
+- Eval table — the table in the project README that lists every sample with its category, expected band, known-gap status, the index of the last run and the result of the row, with a caption naming the plugin copy and the run date and a note on how far the human evidence reaches; the plugin author refreshes it by hand from the report. NOT the eval report (what one run prints and the exit code reports; the table is only a published summary of one such run).
 - Expected band — the range of index a sample of its category must fall into, set before a run. NOT the observed index, which is only what the detector produced.
 - False alarm — a human sample that received an index above the human band. NOT a miss (an AI text without a high index).
 - Index — the score from 0 to 100 the detector gives a text; the higher, the more signs of AI writing. NOT the probability that an AI wrote the text.
