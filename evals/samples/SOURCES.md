@@ -56,7 +56,7 @@ Genres (one per entry): business letters and mail · articles and blogs · techn
 - **Date of writing:** not later than 1916, the author's death — evidence: the work is printed in the 1956 edition above; the exact year is not claimed
 - **Fragment borders:** from «Ні, не видержу! Не можу довше видержати!» to «…чим більше силкуюся забути про нього, затерти його.» (the first two paragraphs of the story, after the title line)
 - **Blind word count:** 248 (by `words()`, before any run of the analyzer)
-- **Change log:** none planned
+- **Change log:** none. The file keeps the one no-break space (U+00A0) of the source; it is not an invisible character in the eval's sense, so it was not altered.
 
 ### human-kotsiubynskyi-dorohoiu-tsinoiu
 
@@ -67,7 +67,7 @@ Genres (one per entry): business letters and mail · articles and blogs · techn
 - **Date of writing:** not later than 1913, the author's death — evidence: the work is printed in the 1955 edition above; the exact year is not claimed
 - **Fragment borders:** from «Діялось це в тридцятих роках минулого століття.» to «…рвалась гаряча уява й тягла за собою сотки й тисячі…» (the first two paragraphs after the title and the subtitle «Оповідання»)
 - **Blind word count:** 173 (by `words()`, before any run of the analyzer)
-- **Change log:** none planned
+- **Change log:** none. The file equals the registered fragment.
 
 ### human-verkhovna-rada-konstytutsiia
 
@@ -78,7 +78,7 @@ Genres (one per entry): business letters and mail · articles and blogs · techn
 - **Date of writing:** 28 June 1996 — evidence: adoption date in the same source; the original version, not a later amended one
 - **Fragment borders:** from «Верховна Рада України від імені Українського народу» to «…визнаються в Україні найвищою соціальною цінністю.» (the preamble and Articles 1–3, first paragraph of Article 3; one source line is one paragraph)
 - **Blind word count:** 152 (by `words()`, before any run of the analyzer)
-- **Change log:** none planned
+- **Change log:** none. The file keeps the two no-break spaces (U+00A0) of the source; they are not invisible characters in the eval's sense, so they were not altered.
 
 ## Refusals
 
