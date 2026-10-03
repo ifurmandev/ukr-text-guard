@@ -65,3 +65,33 @@ def missing_categories(classified):
     if not classified.ai:
         missing.append("ai")
     return missing
+
+
+Error = namedtuple("Error", "kind item reason")
+
+
+def read_known_gaps(path):
+    """Читає known-gaps.txt: пари (назва, причина); відсутній файл дає порожній список."""
+    path = Path(path)
+    if not path.is_file():
+        return []
+    entries = []
+    for line in path.read_bytes().decode("utf-8", errors="replace").splitlines():
+        name, _, reason = line.partition("#")
+        name = name.strip()
+        if name:
+            entries.append((name, reason.strip()))
+    return entries
+
+
+def apply_known_gaps(entries, classified):
+    """Множина позначених ai-зразків і помилки eval.bad_known_gap (немає такого зразка або він human)."""
+    flagged, errors = set(), []
+    for name, _reason in entries:
+        if name in classified.ai:
+            flagged.add(name)
+        elif name in classified.human:
+            errors.append(Error("eval.bad_known_gap", name, "known-gap cannot be put on a human sample"))
+        else:
+            errors.append(Error("eval.bad_known_gap", name, "no such sample"))
+    return flagged, errors

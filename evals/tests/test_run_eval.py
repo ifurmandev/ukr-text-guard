@@ -132,5 +132,55 @@ class ClassifyFolderTest(unittest.TestCase):
         self.assertEqual(ev.missing_categories(both), [])
 
 
+class KnownGapTest(unittest.TestCase):
+    def classified(self):
+        return ev.Classified(["human-a"], ["ai-b", "ai-c"], [], [], 3)
+
+    def write(self, text):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path = Path(tmp.name) / "known-gaps.txt"
+        path.write_bytes(text.encode("utf-8"))
+        return path
+
+    def test_file_format(self):
+        path = self.write("# header\n\nai-b  # imitates human\r\nai-c   \n  \n")
+        self.assertEqual(
+            ev.read_known_gaps(path), [("ai-b", "imitates human"), ("ai-c", "")]
+        )
+
+    def test_missing_file_is_empty_list(self):
+        self.assertEqual(ev.read_known_gaps(Path("no/such/known-gaps.txt")), [])
+
+    def test_flag_on_ai_sample(self):
+        flagged, errors = ev.apply_known_gaps([("ai-b", "why")], self.classified())
+        self.assertEqual(flagged, {"ai-b"})
+        self.assertEqual(errors, [])
+
+    def test_flag_on_human_sample_is_error_and_no_flag(self):
+        flagged, errors = ev.apply_known_gaps([("human-a", "")], self.classified())
+        self.assertEqual(flagged, set())
+        self.assertEqual([(e.kind, e.item) for e in errors],
+                         [("eval.bad_known_gap", "human-a")])
+
+    def test_flag_on_missing_sample_is_error(self):
+        flagged, errors = ev.apply_known_gaps([("ai-zzz", "")], self.classified())
+        self.assertEqual(flagged, set())
+        self.assertEqual([(e.kind, e.item) for e in errors],
+                         [("eval.bad_known_gap", "ai-zzz")])
+
+    def test_duplicate_gives_one_flag_no_error(self):
+        flagged, errors = ev.apply_known_gaps(
+            [("ai-b", ""), ("ai-b", "again")], self.classified())
+        self.assertEqual(flagged, {"ai-b"})
+        self.assertEqual(errors, [])
+
+    def test_seeded_list_in_repo(self):
+        repo = Path(__file__).resolve().parent.parent.parent
+        entries = ev.read_known_gaps(repo / "evals" / "known-gaps.txt")
+        self.assertEqual([n for n, _ in entries], ["ai-prompted-human-style"])
+        self.assertTrue((repo / "evals" / "samples" / "ai-prompted-human-style.txt").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
