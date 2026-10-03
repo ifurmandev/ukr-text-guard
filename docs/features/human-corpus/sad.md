@@ -110,8 +110,8 @@ evals/
 └── samples/
     ├── SOURCES.md       new: selection rule, one section per candidate, refusals section
     ├── human-<author>-<work>.txt   new: at least 3 authors, 150 to 600 words each
-    ├── human-business-letter.txt   removed: 16 words, below 150 (spec US-06, AC-09)
-    ├── human-story.txt             removed: 24 words, below 150 (spec US-06, AC-09)
+    ├── human-business-letter.txt   removed: 67 words, below 150 (spec US-06, AC-09)
+    ├── human-story.txt             removed: 101 words, below 150 (spec US-06, AC-09)
     └── ai-*.txt         unchanged
 README.md                eval table and caption refreshed by hand from the report; rows of the two removed samples dropped
 changelog (at ship)      states that the earlier indexes of the two removed samples are no longer part of the baseline

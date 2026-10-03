@@ -1,0 +1,114 @@
+{
+  "slug": "human-corpus",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Create the sources register skeleton",
+      "layer": "docs",
+      "deps": [],
+      "acs": [
+        "AC-02",
+        "AC-08"
+      ],
+      "dod": "The register file exists with a complete entry template, and the eval reports no new unclassified item.",
+      "files_hint": [
+        "evals/samples/SOURCES.md"
+      ],
+      "file": "docs/features/human-corpus/tasks/create-sources-register.md"
+    },
+    {
+      "id": "T2",
+      "title": "Select candidates and register the first batch",
+      "layer": "docs",
+      "deps": [
+        "T1"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-05",
+        "AC-06",
+        "AC-07"
+      ],
+      "dod": "The register commit lists at least three authors with complete fields and every refusal reason, with no sample file in that commit.",
+      "files_hint": [
+        "evals/samples/SOURCES.md"
+      ],
+      "file": "docs/features/human-corpus/tasks/register-first-batch.md"
+    },
+    {
+      "id": "T3",
+      "title": "Add the sample files and remove the two short ones",
+      "layer": "docs",
+      "deps": [
+        "T2"
+      ],
+      "acs": [
+        "AC-02",
+        "AC-08",
+        "AC-09"
+      ],
+      "dod": "Every human sample file matches its registered fragment apart from logged changes, the two short files are deleted, and the register commit precedes this one.",
+      "files_hint": [
+        "evals/samples/human-*.txt",
+        "evals/samples/human-business-letter.txt",
+        "evals/samples/human-story.txt",
+        "evals/samples/SOURCES.md"
+      ],
+      "file": "docs/features/human-corpus/tasks/add-sample-files.md"
+    },
+    {
+      "id": "T4",
+      "title": "Run the check and verify the verdict",
+      "layer": "tests",
+      "deps": [
+        "T3"
+      ],
+      "acs": [
+        "AC-03",
+        "AC-04",
+        "AC-12"
+      ],
+      "dod": "The saved report shows every human sample at 150 words or more with at least three authors in the register, or records the false alarm or the inconclusive mark as observed.",
+      "files_hint": [
+        "docs/features/human-corpus/eval-report.txt",
+        "evals/run.sh"
+      ],
+      "file": "docs/features/human-corpus/tasks/run-check-and-verify.md"
+    },
+    {
+      "id": "T5",
+      "title": "Refresh the README table and caption",
+      "layer": "docs",
+      "deps": [
+        "T4"
+      ],
+      "acs": [
+        "AC-09",
+        "AC-10",
+        "AC-11",
+        "AC-12"
+      ],
+      "dod": "Every README row and count matches the saved report and the caption names covered and uncovered genres with reasons and the author count.",
+      "files_hint": [
+        "README.md"
+      ],
+      "file": "docs/features/human-corpus/tasks/refresh-readme-table.md"
+    },
+    {
+      "id": "T6",
+      "title": "Write the changelog note on the removed baseline",
+      "layer": "docs",
+      "deps": [
+        "T4"
+      ],
+      "acs": [
+        "AC-09"
+      ],
+      "dod": "The changelog states that the earlier indexes of the two removed samples are no longer part of the baseline and its figures equal the saved report.",
+      "files_hint": [
+        "docs/features/human-corpus/changelog.md"
+      ],
+      "file": "docs/features/human-corpus/tasks/write-changelog-note.md"
+    }
+  ]
+}
