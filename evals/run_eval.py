@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -50,8 +51,10 @@ def classify_folder(samples_dir):
     samples_dir = Path(samples_dir)
     items = sorted(samples_dir.iterdir(), key=lambda p: p.name) if samples_dir.is_dir() else []
     for item in items:
-        if not item.is_file() or item.suffix != ".txt":
+        if not item.is_file() or item.suffix.lower() != ".txt":
             ignored.append(item.name)
+        elif item.suffix != ".txt":
+            unclassified.append(item.name)  # .TXT and the like: reported, never skipped
         elif item.stem.startswith("human-"):
             human.append(item.stem)
         elif item.stem.startswith("ai-"):
@@ -82,7 +85,7 @@ def read_known_gaps(path):
     if not path.is_file():
         return []
     entries = []
-    for line in path.read_bytes().decode("utf-8", errors="replace").splitlines():
+    for line in path.read_bytes().decode("utf-8-sig", errors="replace").splitlines():
         name, _, reason = line.partition("#")
         name = name.strip()
         if name:
@@ -103,12 +106,17 @@ def apply_known_gaps(entries, classified):
     return flagged, errors
 
 
-HIDDEN_CHARS = ("\ufeff", "\u200b", "\u200c", "\u200d", "\u2060")
+# Той самий набір невидимих символів, що рахує аналізатор (analyze.py).
+HIDDEN_CHARS = re.compile("[\u200b-\u200f\u2060-\u2063\ufeff\u00ad\u034f]")
 
 
-def _has_hidden_characters(data):
-    text = data.decode("utf-8", errors="replace")
-    return any(ch in text for ch in HIDDEN_CHARS)
+def _file_quirk(data):
+    """"encoding" для не-UTF-8 байтів, "hidden" для невидимих символів, інакше порожній рядок."""
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return "encoding"
+    return "hidden" if HIDDEN_CHARS.search(text) else ""
 
 
 def _last_line(raw):
@@ -146,12 +154,12 @@ def _parse_result(stdout):
 
 
 def analyze_sample(analyzer_path, sample_path):
-    """Один зразок у свіжому процесі. Повертає (Analysis | Failure, є_приховані_символи)."""
+    """Один зразок у свіжому процесі. Повертає (Analysis | Failure, "" | "hidden" | "encoding")."""
     try:
         data = Path(sample_path).read_bytes()
     except OSError as exc:
-        return Failure("unreadable sample file: %s" % exc), False
-    hidden = _has_hidden_characters(data)
+        return Failure("unreadable sample file: %s" % exc), ""
+    hidden = _file_quirk(data)
     env = dict(os.environ, PYTHONUTF8="1")
     try:
         done = subprocess.run(
@@ -178,7 +186,7 @@ def _gather(root, analyzer_path):
     classified = classify_folder(root / "evals" / "samples")
     entries = read_known_gaps(root / "evals" / "known-gaps.txt")
     flagged, gap_errors = apply_known_gaps(entries, classified)
-    errors = [Error("eval.unclassified_sample", n, "file name starts with neither human- nor ai-")
+    errors = [Error("eval.unclassified_sample", n, "file name is not human-*.txt or ai-*.txt")
               for n in classified.unclassified]
     errors += gap_errors
     errors += [Error("eval.missing_category", c, "no samples in this category")
@@ -246,9 +254,12 @@ def render_report(plugin, gathered, duration):
         elif r.verdict.note == "gap_may_be_closed":
             notes.append("gap may be closed: %s index %d reaches the AI band of %d, review the label"
                          % (r.name, r.outcome.index, AI_MIN))
-        if r.hidden:
+        if r.hidden == "hidden":
             notes.append("hidden characters: %s has a byte-order mark or invisible characters, "
                          "a high index may come from the file rather than the text" % r.name)
+        elif r.hidden == "encoding":
+            notes.append("unexpected encoding: %s is not valid UTF-8, "
+                         "the index may come from the file rather than the text" % r.name)
     if inconclusive:
         notes.append("human conclusion inconclusive: only %d of %d human samples reach %d words"
                      % (len(long_human), len(human_rows), RELIABLE_WORDS))
@@ -331,7 +342,8 @@ def main(argv):
         return 1 if failed else 0
     except Exception as exc:  # будь-який збій самого раннера не має виглядати як успіх
         try:
-            print("runner error: %s: %s" % (type(exc).__name__, exc))
+            print("error eval.runner_error: runner error: %s: %s" % (type(exc).__name__, exc))
+            print("result: failed")
         except Exception:
             pass
         return 1

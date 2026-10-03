@@ -119,6 +119,14 @@ class ClassifyFolderTest(unittest.TestCase):
             len(c.human) + len(c.ai) + len(c.unclassified) + len(c.ignored), c.total
         )
 
+    def test_upper_case_extension_is_unclassified_not_ignored(self):
+        root = self.make(files=["human-a.txt", "ai-b.txt", "human-x.TXT", "ai-y.Txt"])
+        c = ev.classify_folder(root)
+        self.assertEqual(c.human, ["human-a"])
+        self.assertEqual(c.ai, ["ai-b"])
+        self.assertEqual(c.unclassified, ["ai-y.Txt", "human-x.TXT"])
+        self.assertEqual(c.ignored, [])
+
     def test_empty_and_missing_folder(self):
         root = self.make()
         for folder in (root, root / "nope"):
@@ -152,6 +160,10 @@ class KnownGapTest(unittest.TestCase):
         self.assertEqual(
             ev.read_known_gaps(path), [("ai-b", "imitates human"), ("ai-c", "")]
         )
+
+    def test_leading_bom_is_ignored(self):
+        path = self.write("﻿ai-b  # why\n")
+        self.assertEqual(ev.read_known_gaps(path), [("ai-b", "why")])
 
     def test_missing_file_is_empty_list(self):
         self.assertEqual(ev.read_known_gaps(Path("no/such/known-gaps.txt")), [])
@@ -270,9 +282,13 @@ class AnalyzeSampleTest(unittest.TestCase):
 
     def test_hidden_characters_flag(self):
         cases = {
-            "plain": (b"Hello", False),
-            "bom": (b"\xef\xbb\xbfHello", True),
-            "zero-width": ("Hel\u200blo".encode("utf-8"), True),
+            "plain": (b"Hello", ""),
+            "bom": (b"\xef\xbb\xbfHello", "hidden"),
+            "zero-width": ("Hel\u200blo".encode("utf-8"), "hidden"),
+            "soft-hyphen": ("Hel\u00adlo".encode("utf-8"), "hidden"),
+            "direction-mark": ("Hel\u200flo".encode("utf-8"), "hidden"),
+            "invisible-operator": ("Hel\u2062lo".encode("utf-8"), "hidden"),
+            "invalid-utf8": (b"Hel\xff\xfelo", "encoding"),
         }
         for name, (data, expected) in cases.items():
             with self.subTest(name=name):
@@ -436,6 +452,19 @@ class RunCheckTest(unittest.TestCase):
         self.assertFalse(failed)
         self.line_with(report, "hidden", "human-a", "file")
 
+    def test_soft_hyphen_note_explains_a_false_alarm(self):
+        report, failed = self.run_check({
+            "human-a": (32, 200, "Hel­lo".encode("utf-8")), "ai-b": (60, 300)})
+        self.assertTrue(failed)
+        self.line_with(report, "false alarm", "human-a")
+        self.line_with(report, "hidden characters", "human-a")
+
+    def test_invalid_utf8_gets_an_encoding_note(self):
+        report, failed = self.run_check({
+            "human-a": (5, 200, b"Hel\xff\xfelo"), "ai-b": (60, 300)})
+        self.assertFalse(failed)
+        self.line_with(report, "unexpected encoding", "human-a")
+
     def test_two_reports_differ_only_in_the_duration_line(self):
         samples = {"human-a": (20, 40), "ai-b": (9, 300), "ai-c": (60, 300)}
         root, analyzer = self.build(samples, gaps="ai-b\n")
@@ -531,8 +560,10 @@ class CliTest(unittest.TestCase):
         with mock.patch.object(ev, "run_check", side_effect=RuntimeError("boom")):
             code, out = self.main("--root", str(self.build()))
         self.assertEqual(code, 1)
+        self.assertIn("error eval.runner_error", out)
         self.assertIn("runner error", out)
         self.assertIn("boom", out)
+        self.assertIn("result: failed", out)
 
     def test_only_0_and_1_are_ever_returned(self):
         root = self.build()
@@ -552,16 +583,18 @@ def verdict_of(category, analyze, analyzer, sample):
 
 
 def compare_orders(analyze, analyzer, samples):
-    """Verdicts of every sample alone, together in sorted order and together in reverse order.
+    """Verdicts of every sample in sorted order, in reverse order and in a repeated sorted pass.
 
-    Returns the names whose results differ between the three runs.
+    Each analysis is a fresh call, so a sample that depends on earlier runs gives a different
+    result in at least one pass. Returns the names whose results differ between the passes.
     """
     category = lambda p: "human" if p.stem.startswith("human-") else "ai"  # noqa: E731
-    alone = {p.stem: verdict_of(category(p), analyze, analyzer, p) for p in samples}
-    together = {p.stem: verdict_of(category(p), analyze, analyzer, p) for p in samples}
-    reverse = {p.stem: verdict_of(category(p), analyze, analyzer, p) for p in reversed(samples)}
-    return [name for name in alone
-            if not (alone[name] == together[name] == reverse[name])]
+    passes = [
+        {p.stem: verdict_of(category(p), analyze, analyzer, p) for p in order}
+        for order in (samples, list(reversed(samples)), samples)
+    ]
+    first = passes[0]
+    return [name for name in first if not all(other[name] == first[name] for other in passes)]
 
 
 class OrderComparisonSelfTest(unittest.TestCase):
