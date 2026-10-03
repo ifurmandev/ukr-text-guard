@@ -47,7 +47,7 @@ This task delivers the command line: choosing the plugin, finding its detector c
 >
 > — `sad.md §6, «Critical flow 1» and «Flow: summarise the evidence and signal the outcome», abridged` · full text: [sad.md](../sad.md)
 
-> **Correction to the contract (checked on disk, 2026-10-03):** `cli.md §3` gives the detector path as `plugins/<NAME>/skills/ukr-text-guard/scripts/analyze.py`, but the skill folder carries the plugin's own name. The real paths are `plugins/ukr-text-guard/skills/ukr-text-guard/scripts/analyze.py`, `plugins/ukr-text-detector/skills/ukr-text-detector/scripts/analyze.py` and `plugins/ukr-text-editor/skills/ukr-text-editor/scripts/analyze.py`. Use `plugins/<NAME>/skills/<NAME>/scripts/analyze.py`; if the file is absent the copy does not exist (AC-18).
+> **Correction to the contract (checked on disk, 2026-10-03):** `cli.md §3` gives the detector path as `plugins/<NAME>/skills/ukr-text-guard/scripts/analyze.py`, but the skill folder carries the plugin's own name. The real paths are `plugins/ukr-text-guard/skills/ukr-text-guard/scripts/analyze.py`, `plugins/ukr-text-detector/skills/ukr-text-detector/scripts/analyze.py` and `plugins/ukr-text-editor/skills/ukr-text-editor/scripts/analyze.py`. Use `plugins/<NAME>/skills/<NAME>/scripts/analyze.py`; if the file is absent the copy does not exist (AC-18). Resolved in the review fix pass (2026-10-03): `cli.md` now names the real path.
 >
 > — `plugins/*/skills/*/scripts/, directory listing, observed` · full text: [cli.md](../contracts/cli.md)
 

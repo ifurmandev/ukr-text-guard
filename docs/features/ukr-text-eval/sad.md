@@ -322,7 +322,7 @@ sequenceDiagram
         Service-->>NextStep: exit 0
     end
     opt unhandled error inside the service
-        Service-->>Author: print runner error
+        Service-->>Author: print error eval.runner_error and result: failed
         Service-->>NextStep: exit 1
     end
 ```

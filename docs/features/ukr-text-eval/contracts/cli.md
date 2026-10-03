@@ -76,7 +76,7 @@ There is no error registry in the repo, so these names are this contract's propo
 | `eval.analyzer_failure` | crash, timeout, empty, unreadable or incomplete result, index outside 0 to 100; the reason is in the line | AC-09 |
 | `eval.false_alarm` | human sample above 25 | AC-03 |
 | `eval.miss` | ordinary AI sample below 26 | AC-05 |
-| `eval.unclassified_sample` | plain text file with neither prefix (reported by its file name) | AC-12 |
+| `eval.unclassified_sample` | plain text file with neither prefix, or a second file with the same sample name in another letter case of the extension (such as `human-x.txt` next to `human-x.TXT`, possible only on a case-sensitive filesystem); reported by its file name, the second case with its own reason | AC-12 |
 | `eval.bad_known_gap` | entry names a missing sample or a human sample | AC-13, AC-14 |
 | `eval.missing_category` | no samples, no human samples or no AI samples | AC-15 |
 | `eval.missing_detector_copy` | the named plugin has no `analyze.py` | AC-18 |
