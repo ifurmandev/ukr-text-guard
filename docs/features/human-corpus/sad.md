@@ -183,6 +183,138 @@ The flow shows one source for readability: the first batch repeats the first blo
 
 **Critical flow 2: false alarm** — the same flow after the report: a human sample above the band fails the run (exit 1) and stays in the set and in the README table; nothing in the flow changes the sample. Per-AC flow coverage (AC-04, AC-06, AC-09, AC-12) is the `sequences` stage's job.
 
+The flows below use the generic vocabulary: `user` is the plugin author, `service` is the eval runner, `data-store` entries name the file they stand for, `external-system` is a public text source. Flow 1 above keeps its original participant names.
+
+### Flow A: prepare the sample file from the source
+
+```mermaid
+sequenceDiagram
+    actor User as user
+    participant Source as external-system (source)
+    participant Register as data-store (register)
+    participant Samples as data-store (sample files)
+
+    Note over User,Register: precondition: the candidate is registered with fragment borders
+    User->>Source: copies the fragment between the recorded borders
+    User->>User: lists every difference between the copy and the source
+    alt differences are only the cut, removed invisible characters, personal details replaced by neutral words
+        User->>Register: logs each change in the entry's change log
+        Note over User,Register: persists change log entry
+        User->>Samples: saves the file
+    else any other difference (wording, punctuation, order)
+        User->>User: restores the exact source text
+    end
+    Note over User,Samples: postcondition: sample equals source apart from logged changes
+```
+
+### Flow B: run the check and read the verdict
+
+```mermaid
+sequenceDiagram
+    actor User as user
+    participant Service as service (eval runner)
+    participant Samples as data-store (sample files)
+    participant Register as data-store (register)
+
+    Note over User,Samples: precondition: register commit precedes the sample commit
+    User->>Service: runs the check
+    Service->>Samples: reads every sample
+    Service->>Service: analyses each sample against its band
+    alt a human sample is above the human band
+        Service-->>User: lists the sample as a false alarm, run failed
+        Note over User,Samples: the sample stays in the set, no excuse path
+    else every human sample is within the band
+        Service-->>User: reports no false alarm
+    end
+    alt some human sample is below 150 words
+        Service-->>User: marks the human conclusion inconclusive
+        Note over User,Service: the step is not reported as done
+    else all human samples reach 150 words
+        Service-->>User: states that all reach 150 words, no inconclusive mark
+        User->>Register: counts authors, at least 3, one of them another person
+    end
+    Note over User,Service: postcondition: the report is the input of the README refresh
+```
+
+### Flow C: reconsider a recorded sample after an unexpected index
+
+```mermaid
+sequenceDiagram
+    actor User as user
+    participant Register as data-store (register)
+    participant Samples as data-store (sample files)
+    participant Service as service (eval runner)
+
+    Note over User,Samples: precondition: the sample is recorded and the report gave an unexpected index
+    User->>User: considers replacing, dropping or moving the borders of the sample
+    alt the only reason is the index
+        User->>Register: leaves the entry unchanged
+        Note over User,Samples: the sample stays exactly as recorded
+    else reason is provenance, basis for publication, length below 150 or above 600 words, or file defect
+        User->>Register: records the refusal or replacement candidate with the reason
+        Note over User,Register: persists refusal and replacement entry before any file change
+        User->>Samples: removes or replaces the file after the register commit
+        User->>Service: runs the check again
+    end
+```
+
+### Flow D: refresh the README and the changelog, then read them
+
+```mermaid
+sequenceDiagram
+    actor User as user
+    actor Reader as text author
+    participant Service as service (eval runner)
+    participant Readme as data-store (README table)
+    participant Changelog as data-store (changelog)
+
+    Note over User,Service: precondition: a green or recorded report for the new set
+    User->>Service: reads the latest report
+    User->>Readme: refreshes rows and counts from the report, drops the rows of the two removed samples
+    Note over User,Readme: persists table and counts
+    alt the report marks the human conclusion inconclusive
+        User->>Readme: writes in the note that the human conclusion is inconclusive
+    end
+    alt a genre has no human sample of 150 words or more
+        User->>Readme: caption names the genre as not covered with the reason
+    else genre is covered
+        User->>Readme: caption names the genre as covered
+    end
+    User->>Readme: caption states author count and that the set holds classic, official and own texts only
+    User->>Changelog: states that the earlier indexes of the two removed samples are no longer baseline
+    Note over User,Changelog: persists changelog entry
+    Reader->>Readme: opens the README
+    Readme-->>Reader: authors, covered genres, uncovered genres, no claim for other modern text
+```
+
+**Coverage of user stories and acceptance criteria**
+
+| Item | Shown by |
+|---|---|
+| US-01 | Flow 1 (register before files), Flow C |
+| US-02 | Flow 1, Flow A |
+| US-03 | Flow B, Flow 1 (removal of short samples) |
+| US-04 | Flow B |
+| US-05 | Flow 1 (refusal branch) |
+| US-06 | Flow 1, Flow D |
+| US-07 | Flow D |
+| US-08 | Flow D |
+| AC-01, AC-02 | Flow 1 |
+| AC-03, AC-04, AC-12 | Flow B (AC-12 README note: Flow D) |
+| AC-05, AC-07 | Flow 1 (refusal branch) |
+| AC-06 | Flow 1 (length) and Flow C (index is never a reason) |
+| AC-08 | Flow A |
+| AC-09 | Flow 1 (removal) and Flow D (README rows, changelog) |
+| AC-10, AC-11 | Flow D |
+
+No story or criterion is uncovered and none is a non-runtime N/A.
+
+**Flags for `design`:**
+
+- Flow 1 and the prose stub of flow 2 predate the generic vocabulary and use named participants (plugin author, register, eval runner); Flows A–D use the generic ones. The stub «Critical flow 2» is now drawn as Flow B. Reconcile the naming if wanted; nothing was rewritten here.
+- Every persist note writes a text file or a document (register entry, change log, sample file, README table, changelog). No new table, column or index is implied, so `data-model` has nothing to design.
+- No ADR-worthy decision beyond ADR-0001 and ADR-0002 surfaced.
+
 ## 7. Deployment view
 
 <!-- N/A: no deployment unit; the feature is text files in the repository, and the eval runs by hand on the plugin author's machine. -->
