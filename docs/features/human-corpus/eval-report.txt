@@ -1,0 +1,38 @@
+plugin: ukr-text-guard
+ai-chat-residue-placeholders             AI            index 70   words 43   reliability низька (текст закороткий)   passed
+ai-cliche                                AI            index 58   words 113   reliability низька (текст закороткий)   passed
+ai-engineered-humanity                   AI            index 29   words 107   reliability низька (текст закороткий)   passed
+ai-homoglyph-obfuscated                  AI            index 83   words 113   reliability низька (текст закороткий)   passed
+ai-prompted-human-style                  known-gap AI  index 9   words 226   reliability середня   passed
+ai-website-stages-2010-2015              AI            index 70   words 755   reliability прийнятна   passed
+ai-website-stages-generic                AI            index 44   words 348   reliability середня   passed
+ai-zero-width-obfuscated                 AI            index 83   words 113   reliability низька (текст закороткий)   passed
+human-franko-miy-zlochyn                 human         index 10   words 248   reliability середня   passed
+human-kotsiubynskyi-dorohoiu-tsinoiu     human         index 11   words 173   reliability середня   passed
+human-verkhovna-rada-konstytutsiia       human         index 19   words 152   reliability середня   passed
+
+known-gap samples (excused by evals/known-gaps.txt):
+  known-gap: ai-prompted-human-style  # imitates human writing, index 9 on the first run
+
+notes:
+  hidden characters: ai-zero-width-obfuscated has a byte-order mark or invisible characters, a high index may come from the file rather than the text
+  drift: human-verkhovna-rada-konstytutsiia index 19 is above 15, still within the human band of 25
+
+summary: 3 human, 8 AI, 0 unclassified, 1 ignored, 12 of 12 items
+ordinary AI samples with index 51 or more: 5 of 7 (for information)
+human samples with 150 words or more: 3 of 3
+ignored: SOURCES.md
+duration 1.0 s
+result: passed
+
+--- run metadata (added by T4) ---
+date: 2026-10-03
+command: bash evals/run.sh
+exit code: 0
+second run identical apart from duration: yes
+verdict: AC-03 observed. All 3 human samples at 150 words or more, no inconclusive mark, 3 authors in the register (Franko, Kotsiubynskyi: another person; Verkhovna Rada: official body). No false alarm (AC-04 not triggered). Drift note: human-verkhovna-rada-konstytutsiia index 19 is above 15 and within the human band of 25; the sample is untouched.
+git log order (evals/samples):
+715b94f feat(human-corpus): add human samples, remove two short ones
+60780f0 docs(human-corpus): register first batch of candidates
+0e574fb docs(human-corpus): add sources register skeleton
+cc92e74 test: eval samples and runner (10 texts, human/AI/bypass)
