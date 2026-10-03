@@ -179,6 +179,193 @@ sequenceDiagram
     end
 ```
 
+### Flow: validate and classify the sample folder
+
+Realises US-07 (AC-12, AC-15, AC-17) and the input checks of US-03 (AC-07, AC-13, AC-14). Read only, nothing is persisted.
+
+```mermaid
+sequenceDiagram
+    participant Service as service
+    participant Samples as data-store, samples
+    participant Gaps as data-store, known-gaps
+
+    Note over Service,Samples: precondition, a detector copy was found
+    Service->>Samples: list every item in the folder
+    Samples-->>Service: items
+    loop each item
+        alt not a plain text file, or inside a subfolder
+            Service->>Service: mark the item ignored
+        else name starts with human-
+            Service->>Service: classify as human
+        else name starts with ai-
+            Service->>Service: classify as AI
+        else any other plain text file
+            Service->>Service: mark unclassified and record a failure
+        end
+    end
+    Service->>Gaps: read the known-gap list
+    Gaps-->>Service: names and optional reasons
+    loop each known-gap entry
+        alt names a sample that does not exist
+            Service->>Service: record a bad-entry failure naming it
+        else names a human sample
+            Service->>Service: record a bad-entry failure and keep judging it as human
+        else names an AI sample
+            Service->>Service: set the known-gap flag on that sample
+        end
+    end
+    alt no samples at all, or no human samples, or no AI samples
+        Service->>Service: record a missing-category failure naming it
+    end
+    Note over Service,Samples: postcondition, every item is classified, unclassified or ignored
+```
+
+### Flow: analyse one sample and fail closed
+
+Realises US-05 (AC-09, AC-10). Each sample gets its own fresh process, so no state survives from one sample to the next and the order of samples cannot change a result.
+
+```mermaid
+sequenceDiagram
+    participant Service as service
+    participant Samples as data-store, samples
+    participant Detector as external-system, detector copy
+
+    Service->>Samples: read the sample as bytes
+    Samples-->>Service: file contents
+    Service->>Service: decode as UTF-8 with replacement and scan for a byte-order mark or invisible characters
+    Service->>Detector: start a fresh process with UTF-8 forced and a 10 second limit
+    alt no result within 10 seconds
+        Service->>Detector: stop the process
+        Service->>Service: record an analyzer failure, timed out
+    else process crashed or exited with an error
+        Detector-->>Service: error exit
+        Service->>Service: record an analyzer failure, crashed
+    else empty output
+        Detector-->>Service: nothing
+        Service->>Service: record an analyzer failure, empty result
+    else output cannot be read as a result
+        Detector-->>Service: unreadable text
+        Service->>Service: record an analyzer failure, unreadable result
+    else index or reliability is missing
+        Detector-->>Service: incomplete result
+        Service->>Service: record an analyzer failure, incomplete result
+    else index outside 0 to 100
+        Detector-->>Service: out-of-range index
+        Service->>Service: record an analyzer failure, index out of range
+    else usable result
+        Detector-->>Service: index, word count and reliability
+        Service->>Service: keep the analysis for judging
+    end
+    Note over Service,Detector: the process ends here, nothing is kept for the next sample
+```
+
+### Flow: judge one sample
+
+Realises US-01, US-02, US-03 and US-08 (AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-13). A pure step with no I/O. The inputs are the category, the known-gap flag and the analysis or failure from the previous flow.
+
+```mermaid
+sequenceDiagram
+    participant Service as service
+
+    Note over Service: precondition, a classified sample with its flag and analysis or failure
+    alt analyzer failure
+        Service->>Service: verdict failed, with the failure reason, never a low index
+    else human sample, with or without a flag
+        alt index above 25
+            Service->>Service: verdict failed, listed separately as a false alarm
+        else index above 15
+            Service->>Service: verdict passed, drift warning naming the sample
+        else index 15 or below
+            Service->>Service: verdict passed
+        end
+    else ordinary AI sample without a flag
+        alt index below 26
+            Service->>Service: verdict failed, listed as a miss
+        else index 26 or above
+            Service->>Service: verdict passed
+            opt index 51 or above
+                Service->>Service: count it as high level, for information only
+            end
+        end
+    else known-gap AI sample
+        alt index 26 or above
+            Service->>Service: verdict passed, warning that the gap may be closed
+        else index below 26
+            Service->>Service: verdict passed, listed as a known-gap
+        end
+    end
+    Note over Service: postcondition, only an explicit flag on an AI sample excuses a sample and a flag never turns a failure into a pass
+```
+
+### Flow: summarise the evidence and signal the outcome
+
+Realises US-04 (AC-08, AC-19) and the outcome signal of US-01 and US-06 (AC-16). It reads only the verdicts of the earlier flows.
+
+```mermaid
+sequenceDiagram
+    actor Author as plugin author
+    participant Service as service
+    participant NextStep as external-system, next step
+
+    Note over Service: precondition, every sample has a verdict and the folder checks are done
+    Service->>Service: count samples per category plus ignored items and compare with the folder total
+    Service->>Service: count human samples that reach 150 words by the analyzer's own word count
+    alt fewer than all human samples reach 150 words
+        Service->>Service: mark the human conclusion inconclusive as a note
+    end
+    Service->>Service: list every known-gap sample with its reason
+    Service->>Service: gather notes, drift, gap may be closed, inconclusive, hidden characters
+    Service-->>Author: print the report with each word count and reliability, the evidence summary and the duration
+    alt any failure exists, analyzer failure, false alarm, miss, unclassified item, bad known-gap entry, missing category or missing detector copy
+        Service-->>NextStep: exit 1
+    else only notes or nothing at all
+        Service-->>NextStep: exit 0
+    end
+    opt unhandled error inside the service
+        Service-->>Author: print runner error
+        Service-->>NextStep: exit 1
+    end
+```
+
+### Coverage of use cases and acceptance criteria
+
+| Use case | Flow |
+|---|---|
+| US-01 Run the check | Critical flow 1, judge one sample, summarise and signal |
+| US-02 See false alarms | judge one sample |
+| US-03 Track known-gaps | validate and classify (entry checks), judge one sample |
+| US-04 Know the evidence | analyse one sample (word count and reliability), summarise and signal |
+| US-05 Trust the tool | analyse one sample and fail closed |
+| US-06 Check every copy | Critical flow 1 (plugin choice, missing copy), summarise and signal |
+| US-07 Add a sample safely | validate and classify |
+| US-08 Not be accused | judge one sample (false alarm fails), validate and classify (flag on a human sample) |
+
+| AC | Shown by |
+|---|---|
+| AC-01 | Critical flow 1, summarise and signal (exit 0) |
+| AC-02 | judge one sample (high-level count) |
+| AC-03 | judge one sample (false alarm) |
+| AC-04 | judge one sample (drift warning) |
+| AC-05 | judge one sample (miss) |
+| AC-06 | judge one sample (gap may be closed) |
+| AC-07 | judge one sample (no excuse without a flag), summarise and signal (known-gap list) |
+| AC-08 | summarise and signal (150-word count, inconclusive), analyse one sample (word count and reliability) |
+| AC-09 | analyse one sample and fail closed (every branch) |
+| AC-10 | analyse one sample and fail closed (fresh process per sample). The three-order comparison itself is a test (SAD §10 QG-1), not a runtime path |
+| AC-11 | Critical flow 1 (resolve the copy of the chosen plugin) |
+| AC-12 | validate and classify (unclassified branch, per-category counts) |
+| AC-13 | validate and classify (flag on a human sample), judge one sample (human band applies) |
+| AC-14 | validate and classify (flag names a missing sample) |
+| AC-15 | validate and classify (missing category) |
+| AC-16 | summarise and signal (exit 0 or 1), Critical flow 1 |
+| AC-17 | validate and classify (ignored items) |
+| AC-18 | Critical flow 1 (no detector copy branch) |
+| AC-19 | summarise and signal (notes never reach the exit branch) |
+
+Flagged for design: no participant outside §5 is used (`service` is `run_eval.py`, the data-stores are the sample folder and `known-gaps.txt`, the detector copy is `analyze.py`, the next step is the roadmap's later steps). No feature step persists data, so there is no schema hint for `data-model`.
+
+Flagged for spec and ADR-0001 (decided by the plugin author during `sequences`, not applied here): the first known-gap list holds only `ai-prompted-human-style` (index 9). `ai-engineered-humanity` (index 29) already reaches the AI band of 26, so it is an ordinary AI sample and not a known-gap. Spec §1 and ADR-0001 (Consequences) still say the first run flags both samples. The flows above are unaffected, because a known-gap sample at 26 or above still gets the gap-may-be-closed warning.
+
 **Critical flow 2: event propagation** — <!-- N/A: no events, no async work; the runner is a synchronous script -->.
 
 ## 7. Deployment view
