@@ -542,5 +542,65 @@ class CliTest(unittest.TestCase):
                 self.assertIn(code, (0, 1))
 
 
+REPO = Path(__file__).resolve().parent.parent.parent
+REAL_ANALYZER = ev.resolve_detector(REPO, ev.DEFAULT_PLUGIN)
+
+
+def verdict_of(category, analyze, analyzer, sample):
+    outcome, _hidden = analyze(analyzer, sample)
+    return outcome, ev.judge(category, False, outcome)
+
+
+def compare_orders(analyze, analyzer, samples):
+    """Verdicts of every sample alone, together in sorted order and together in reverse order.
+
+    Returns the names whose results differ between the three runs.
+    """
+    category = lambda p: "human" if p.stem.startswith("human-") else "ai"  # noqa: E731
+    alone = {p.stem: verdict_of(category(p), analyze, analyzer, p) for p in samples}
+    together = {p.stem: verdict_of(category(p), analyze, analyzer, p) for p in samples}
+    reverse = {p.stem: verdict_of(category(p), analyze, analyzer, p) for p in reversed(samples)}
+    return [name for name in alone
+            if not (alone[name] == together[name] == reverse[name])]
+
+
+class OrderComparisonSelfTest(unittest.TestCase):
+    """The comparison must be able to fail, or the real-analyzer test below proves nothing."""
+
+    def test_detects_a_sample_whose_result_depends_on_earlier_runs(self):
+        calls = {"n": 0}
+
+        def stateful(_analyzer, _sample):
+            calls["n"] += 1
+            return ev.Analysis(calls["n"], 100, "x"), False
+
+        samples = [Path("human-a.txt"), Path("ai-b.txt")]
+        self.assertEqual(sorted(compare_orders(stateful, None, samples)),
+                         ["ai-b", "human-a"])
+
+    def test_stable_analyzer_gives_no_difference(self):
+        def stable(_analyzer, sample):
+            return ev.Analysis(len(sample.stem), 100, "x"), False
+
+        self.assertEqual(
+            compare_orders(stable, None, [Path("human-a.txt"), Path("ai-b.txt")]), [])
+
+
+@unittest.skipIf(REAL_ANALYZER is None, "real detector copy ukr-text-guard is absent in this checkout")
+class RealAnalyzerTest(unittest.TestCase):
+    def test_every_real_sample_gets_the_same_result_in_any_order(self):
+        samples = sorted((REPO / "evals" / "samples").glob("*.txt"))
+        self.assertTrue(samples, "no real samples found")
+        differing = compare_orders(ev.analyze_sample, REAL_ANALYZER, samples)
+        self.assertEqual(differing, [], "results differ between runs for: %s" % differing)
+
+    def test_two_real_reports_differ_only_in_the_duration_line(self):
+        def stripped():
+            report, _ = ev.run_check(REPO, REAL_ANALYZER, ev.DEFAULT_PLUGIN)
+            return [ln for ln in report.splitlines() if not ln.startswith("duration")]
+
+        self.assertEqual(stripped(), stripped())
+
+
 if __name__ == "__main__":
     unittest.main()
