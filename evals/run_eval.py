@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Перевірка детектора: прогін зразків через аналізатор і порівняння з очікуваними смугами."""
+import argparse
 import json
 import os
 import subprocess
@@ -282,3 +283,59 @@ def run_check(root, analyzer_path, plugin=DEFAULT_PLUGIN):
     started = time.monotonic()
     gathered = _gather(root, analyzer_path)
     return render_report(plugin, gathered, time.monotonic() - started)
+
+
+def resolve_detector(root, plugin):
+    """Шлях до analyze.py плагіна або None, якщо копії детектора немає."""
+    if not plugin or Path(plugin).name != plugin or plugin in (".", ".."):
+        return None
+    path = Path(root) / "plugins" / plugin / "skills" / plugin / "scripts" / "analyze.py"
+    return path if path.is_file() else None
+
+
+def _parser():
+    parser = argparse.ArgumentParser(
+        prog="run_eval.py",
+        description="Check the detector against expected bands for every sample.")
+    parser.add_argument("--plugin", default=DEFAULT_PLUGIN,
+                        help="plugin whose detector copy is measured (default: %(default)s)")
+    parser.add_argument("--root", default=None,
+                        help="repo root holding plugins/ and evals/ (default: derived from this script)")
+    return parser
+
+
+def _print_utf8():
+    stream = sys.stdout
+    if hasattr(stream, "reconfigure"):
+        stream.reconfigure(encoding="utf-8", errors="replace")
+
+
+def main(argv):
+    """Точка входу: повертає лише 0 (нічого не впало) або 1 (будь-що інше)."""
+    try:
+        args = _parser().parse_args(argv)
+    except SystemExit as exc:
+        return 0 if exc.code in (0, None) else 1
+    try:
+        _print_utf8()
+        root = Path(args.root) if args.root else Path(__file__).resolve().parent.parent
+        analyzer = resolve_detector(root, args.plugin)
+        if analyzer is None:
+            print("plugin: %s" % args.plugin)
+            print("error eval.missing_detector_copy: no detector copy exists for plugin %s"
+                  % args.plugin)
+            print("result: failed")
+            return 1
+        report, failed = run_check(root, analyzer, args.plugin)
+        print(report)
+        return 1 if failed else 0
+    except Exception as exc:  # будь-який збій самого раннера не має виглядати як успіх
+        try:
+            print("runner error: %s: %s" % (type(exc).__name__, exc))
+        except Exception:
+            pass
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

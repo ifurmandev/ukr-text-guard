@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import sys
 import tempfile
@@ -449,6 +451,95 @@ class RunCheckTest(unittest.TestCase):
             "human-b": (5, 200), "ai-z": (60, 300), "human-a": (5, 200), "ai-y": (60, 300)})
         positions = [report.index(n) for n in ("ai-y", "ai-z", "human-a", "human-b")]
         self.assertEqual(positions, sorted(positions))
+
+
+class CliTest(unittest.TestCase):
+    def build(self, plugins=("ukr-text-guard",), samples=None):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        samples = samples or {"human-a": (5, 200), "ai-b": (60, 300)}
+        folder = root / "evals" / "samples"
+        folder.mkdir(parents=True)
+        for name in samples:
+            (folder / (name + ".txt")).write_bytes(b"text")
+        for plugin in plugins:
+            scripts = root / "plugins" / plugin / "skills" / plugin / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "analyze.py").write_text(FAKE_BY_NAME % (samples,), encoding="utf-8")
+        return root
+
+    def main(self, *argv):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            code = ev.main(list(argv))
+        return code, out.getvalue()
+
+    def test_default_plugin_is_named_and_exit_0(self):
+        code, out = self.main("--root", str(self.build()))
+        self.assertEqual(code, 0)
+        self.assertIn("plugin: ukr-text-guard", out)
+        self.assertIn("result: passed", out)
+
+    def test_plugin_option_picks_another_copy(self):
+        root = self.build(plugins=("ukr-text-guard", "ukr-text-editor"))
+        code, out = self.main("--root", str(root), "--plugin", "ukr-text-editor")
+        self.assertEqual(code, 0)
+        self.assertIn("plugin: ukr-text-editor", out)
+
+    def test_failing_copy_fails_only_its_own_run(self):
+        root = self.build(plugins=("ukr-text-guard",))
+        broken = root / "plugins" / "ukr-text-detector" / "skills" / "ukr-text-detector" / "scripts"
+        broken.mkdir(parents=True)
+        (broken / "analyze.py").write_text("import sys\nsys.exit(2)\n", encoding="utf-8")
+        self.assertEqual(self.main("--root", str(root))[0], 0)
+        self.assertEqual(self.main("--root", str(root), "--plugin", "ukr-text-detector")[0], 1)
+
+    def test_missing_copy_exits_1_and_says_so(self):
+        code, out = self.main("--root", str(self.build()), "--plugin", "ukr-text-unknown")
+        self.assertEqual(code, 1)
+        self.assertIn("plugin: ukr-text-unknown", out)
+        self.assertIn("eval.missing_detector_copy", out)
+        self.assertIn("result: failed", out)
+
+    def test_plugin_name_cannot_escape_the_plugins_folder(self):
+        code, out = self.main("--root", str(self.build()), "--plugin", "../x")
+        self.assertEqual(code, 1)
+        self.assertIn("eval.missing_detector_copy", out)
+
+    def test_root_without_plugins_is_a_missing_copy(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        code, out = self.main("--root", tmp.name)
+        self.assertEqual(code, 1)
+        self.assertIn("eval.missing_detector_copy", out)
+
+    def test_bad_option_exits_1_not_2(self):
+        self.assertEqual(self.main("--bogus")[0], 1)
+        self.assertEqual(self.main("--plugin")[0], 1)
+
+    def test_help_exits_0(self):
+        code, out = self.main("--help")
+        self.assertEqual(code, 0)
+        self.assertIn("--plugin", out)
+
+    def test_failing_run_exits_1(self):
+        root = self.build(samples={"human-a": (40, 200), "ai-b": (60, 300)})
+        self.assertEqual(self.main("--root", str(root))[0], 1)
+
+    def test_forced_exception_is_a_runner_error_and_exit_1(self):
+        with mock.patch.object(ev, "run_check", side_effect=RuntimeError("boom")):
+            code, out = self.main("--root", str(self.build()))
+        self.assertEqual(code, 1)
+        self.assertIn("runner error", out)
+        self.assertIn("boom", out)
+
+    def test_only_0_and_1_are_ever_returned(self):
+        root = self.build()
+        for argv in ([], ["--plugin", "x"], ["--bogus"], ["--help"]):
+            with self.subTest(argv=argv):
+                code, _ = self.main("--root", str(root), *argv)
+                self.assertIn(code, (0, 1))
 
 
 if __name__ == "__main__":
