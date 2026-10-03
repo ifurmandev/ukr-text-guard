@@ -74,7 +74,7 @@ Genres (one per entry): business letters and mail · articles and blogs · techn
 - **Author:** Verkhovna Rada of Ukraine (an official body)
 - **Genre:** technical and legal documents
 - **Source:** uk.wikisource.org, «Конституція України (1996)», the text as adopted on 28 June 1996, https://uk.wikisource.org/wiki/Конституція_України_(1996)
-- **Basis for publication:** official document outside copyright (Law of Ukraine «On Copyright and Related Rights», Art. 10: official documents of state bodies are not objects of copyright)
+- **Basis for publication:** official document outside copyright (Law of Ukraine «On Copyright and Related Rights» No. 3792-XII of 23 December 1993, Art. 10, in force when the text was adopted; since 1 January 2023 the law in force is No. 2811-IX, which likewise leaves official documents of state bodies outside copyright — the article number in the new law is not claimed here)
 - **Date of writing:** 28 June 1996 — evidence: adoption date in the same source; the original version, not a later amended one
 - **Fragment borders:** from «Верховна Рада України від імені Українського народу» to «…визнаються в Україні найвищою соціальною цінністю.» (the preamble and Articles 1–3, first paragraph of Article 3; one source line is one paragraph)
 - **Blind word count:** 152 (by `words()`, before any run of the analyzer)
@@ -83,3 +83,12 @@ Genres (one per entry): business letters and mail · articles and blogs · techn
 ## Refusals
 
 No candidate has been refused in the first batch. A refusal is recorded here in the refusal template format.
+
+### Removed and replaced
+
+- **human-business-letter** — reason: AC-06 length: 67 words by `words()`, below 150; replaced by the three samples above — 2026-10-03. The text had already been run through the analyzer (index 0); the index was not the reason.
+- **human-story** — reason: AC-06 length: 101 words by `words()`, below 150; replaced by the three samples above — 2026-10-03. The text had already been run through the analyzer (index 7); the index was not the reason.
+
+### Deferred: the plugin author's own texts
+
+No own-text candidate was selected in the first batch, so business mail and articles and blogs stay uncovered. The reason is a lack of a candidate that has a dated original and holds no third-party personal data; it is not a refusal under AC-05 or AC-07. A later batch may add one under the same rules.
