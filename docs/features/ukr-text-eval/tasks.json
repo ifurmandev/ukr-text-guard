@@ -1,0 +1,95 @@
+{
+  "slug": "ukr-text-eval",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Add the pure judging function and the band constants",
+      "layer": "domain",
+      "deps": [],
+      "acs": ["AC-03", "AC-04", "AC-05", "AC-06", "AC-07"],
+      "dod": "Boundary table tests for human, ordinary AI and known-gap AI samples pass, and a known-gap flag never turns a failed verdict into a passed one.",
+      "files_hint": ["evals/run_eval.py", "evals/tests/test_run_eval.py"],
+      "file": "docs/features/ukr-text-eval/tasks/t1-judge-core.md"
+    },
+    {
+      "id": "T2",
+      "title": "Discover and classify the items of the sample folder",
+      "layer": "infra",
+      "deps": [],
+      "acs": ["AC-12", "AC-15", "AC-17"],
+      "dod": "Unit tests show every folder item is classified, unclassified or ignored, per-category counts plus ignored equal the folder total, and missing categories are named.",
+      "files_hint": ["evals/run_eval.py", "evals/tests/test_run_eval.py"],
+      "file": "docs/features/ukr-text-eval/tasks/t2-classify-samples.md"
+    },
+    {
+      "id": "T3",
+      "title": "Read and validate the known-gap list, seed it with the first entry",
+      "layer": "infra",
+      "deps": ["T2"],
+      "acs": ["AC-13", "AC-14"],
+      "dod": "Unit tests show a known-gap entry flags an AI sample only, while an entry naming a human or a missing sample is an eval.bad_known_gap error, and evals/known-gaps.txt holds the seeded line.",
+      "files_hint": ["evals/run_eval.py", "evals/known-gaps.txt", "evals/tests/test_run_eval.py"],
+      "file": "docs/features/ukr-text-eval/tasks/t3-known-gap-list.md"
+    },
+    {
+      "id": "T4",
+      "title": "Analyse one sample in a fresh process and fail closed",
+      "layer": "infra",
+      "deps": [],
+      "acs": ["AC-09", "AC-10"],
+      "dod": "Fake-analyzer tests show a crash, a hang past the limit, an empty, unreadable or incomplete result and an out-of-range index each end as an analyzer failure with a reason, never as an index.",
+      "files_hint": ["evals/run_eval.py", "evals/tests/test_run_eval.py"],
+      "file": "docs/features/ukr-text-eval/tasks/t4-analyze-sample.md"
+    },
+    {
+      "id": "T5",
+      "title": "Build the report, the evidence summary and the outcome decision",
+      "layer": "app",
+      "deps": ["T1", "T2", "T3", "T4"],
+      "acs": ["AC-01", "AC-02", "AC-07", "AC-08", "AC-19"],
+      "dod": "Report tests against a fake analyzer show all contract facts appear, notes alone give a passed run, any failure kind gives a failed run, and two reports of the same inputs differ only in the duration line.",
+      "files_hint": ["evals/run_eval.py", "evals/tests/test_run_eval.py"],
+      "file": "docs/features/ukr-text-eval/tasks/t5-report-and-outcome.md"
+    },
+    {
+      "id": "T6",
+      "title": "Add the CLI entry point, detector copy lookup and exit code",
+      "layer": "ports",
+      "deps": ["T5"],
+      "acs": ["AC-11", "AC-16", "AC-18"],
+      "dod": "Tests show the header names the chosen plugin (ukr-text-guard by default), a missing copy exits 1, a bad option exits 1, a forced exception exits 1, and no path returns a code other than 0 or 1.",
+      "files_hint": ["evals/run_eval.py", "evals/tests/test_run_eval.py"],
+      "file": "docs/features/ukr-text-eval/tasks/t6-cli-entrypoint.md"
+    },
+    {
+      "id": "T7",
+      "title": "Make run.sh a thin delegate that finds a working Python",
+      "layer": "wiring",
+      "deps": ["T6"],
+      "acs": ["AC-16"],
+      "dod": "In Git Bash, bash evals/run.sh prints the report and returns the runner's exit code (0 on the real folder or a passing run, 1 with --plugin ukr-text-unknown).",
+      "files_hint": ["evals/run.sh"],
+      "file": "docs/features/ukr-text-eval/tasks/t7-run-sh-delegate.md"
+    },
+    {
+      "id": "T8",
+      "title": "Prove independence and repeatability on the real analyzer",
+      "layer": "tests",
+      "deps": ["T6"],
+      "acs": ["AC-10"],
+      "dod": "The unit test suite passes with a test that gives equal verdicts for every real sample alone, together and in reverse order, and two real-folder reports equal apart from the duration line.",
+      "files_hint": ["evals/tests/test_run_eval.py"],
+      "file": "docs/features/ukr-text-eval/tasks/t8-independence-tests.md"
+    },
+    {
+      "id": "T9",
+      "title": "Verify the first real run on both shells and update the docs",
+      "layer": "docs",
+      "deps": ["T7", "T8"],
+      "acs": ["AC-01"],
+      "dod": "Verdict lines of the real run in PowerShell and in Git Bash are identical, the run takes at most 60 s, and docs/architecture-map.md and CONTEXT.md describe the new check and terms.",
+      "files_hint": ["docs/architecture-map.md", "CONTEXT.md"],
+      "file": "docs/features/ukr-text-eval/tasks/t9-first-run-verification.md"
+    }
+  ]
+}

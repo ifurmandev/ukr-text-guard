@@ -48,7 +48,7 @@ The check must excuse AI samples that the detector is known to miss (known-gap) 
 
 **Neutral**
 - Moving to a manifest later is possible and mechanical (the list is tiny), but the category rule in AC-12 would then need a new acceptance criterion.
-- The first run flags two samples: `ai-engineered-humanity` and `ai-prompted-human-style` (spec §1).
+- The first run flags one sample: `ai-prompted-human-style` (index 9). `ai-engineered-humanity` (index 29) already reaches the AI band, so it stays an ordinary AI sample (spec §1). Amended 2026-10-03 after review: the original text listed both samples.
 
 ## Links
 
