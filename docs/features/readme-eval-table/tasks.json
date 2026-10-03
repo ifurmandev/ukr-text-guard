@@ -1,0 +1,55 @@
+{
+  "slug": "readme-eval-table",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Run the eval on the ukr-text-guard copy and gate on run-level failure",
+      "layer": "docs",
+      "deps": [],
+      "acs": ["AC-09b"],
+      "dod": "A report from a run without a run-level failure is kept with its exit code and the run date, and no file in the repo is changed.",
+      "files_hint": ["evals/run.sh"],
+      "file": "docs/features/readme-eval-table/tasks/run-eval-and-gate.md"
+    },
+    {
+      "id": "T2",
+      "title": "Replace the README sample table with the eval table header and rows",
+      "layer": "docs",
+      "deps": ["T1"],
+      "acs": ["AC-01", "AC-02"],
+      "dod": "The old table is replaced by one 6-column plain-markdown table whose rows and per-category counts equal the report and whose bands read 25 or below for human and 26 or above for AI.",
+      "files_hint": ["README.md"],
+      "file": "docs/features/readme-eval-table/tasks/write-table-rows.md"
+    },
+    {
+      "id": "T3",
+      "title": "Fill the result cells with the six-value mapping, known-gap and failed rows",
+      "layer": "docs",
+      "deps": ["T2"],
+      "acs": ["AC-03", "AC-04", "AC-07", "AC-08", "AC-09"],
+      "dod": "Every result cell is one of the six AC-08 values matching the report, only samples listed in known-gaps.txt are known-gap, and a failed row shows its reason.",
+      "files_hint": ["README.md"],
+      "file": "docs/features/readme-eval-table/tasks/apply-result-mapping.md"
+    },
+    {
+      "id": "T4",
+      "title": "Add the caption, the evidence note and the pointer to the honest-limit section",
+      "layer": "docs",
+      "deps": ["T1"],
+      "acs": ["AC-05", "AC-05b", "AC-06", "AC-10"],
+      "dod": "The caption names the plugin copy and the run date, the note states how many human samples reach 150 words out of how many, and the text near the table links to the honest-limit section.",
+      "files_hint": ["README.md"],
+      "file": "docs/features/readme-eval-table/tasks/add-caption-and-notes.md"
+    },
+    {
+      "id": "T5",
+      "title": "Compare the table with the report and prepare the pull request",
+      "layer": "docs",
+      "deps": ["T3", "T4"],
+      "acs": ["AC-08"],
+      "dod": "A cell-by-cell comparison with the pasted report shows zero differences and the diff touches only README.md and CONTEXT.md outside docs, with no code file.",
+      "files_hint": ["README.md", "CONTEXT.md"],
+      "file": "docs/features/readme-eval-table/tasks/verify-against-report.md"
+    }
+  ]
+}

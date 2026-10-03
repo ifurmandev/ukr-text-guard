@@ -103,7 +103,7 @@ The change touches two documents and no code: a hand-edited table in the README 
 
 ```
 README.md                  section «Перевірка»: intro line, eval table, caption, notes (old table replaced)
-CONTEXT.md                 term «Eval table» (already added in the working tree)
+CONTEXT.md                 term «Eval table» (added in commit 8f3d89e)
 evals/run_eval.py          unchanged; prints the report that feeds the table
 ```
 
@@ -216,4 +216,4 @@ ADR files live under `docs/features/readme-eval-table/adr/NNNN-<title>.md`.
 | Eval report | What one eval run prints and its exit code reports; the source of the category, known-gap, index and result cells of the table |
 | Known-gap | A flag the plugin author puts on an AI sample that the detector is known to miss; the sample is tracked and never fails a run. NOT a category of its own and NOT a failing check; it can never be put on a human sample |
 | Result of the row | One of six values derived from the report: passed, failed (false alarm, miss or analyzer failure), known-gap, gap may be closed |
-| Evidence note | The note beside the table that states how many human samples reach 150 words, the point at which the analyzer rates its statistics as reliable |
+| Evidence note | The note beside the table that states how many human samples reach 150 words, the point under which the analyzer marks its statistics as low |
