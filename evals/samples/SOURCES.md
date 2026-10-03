@@ -47,8 +47,39 @@ Genres (one per entry): business letters and mail · articles and blogs · techn
 
 ## Samples
 
-(no entries yet)
+### human-franko-miy-zlochyn
+
+- **Author:** Ivan Franko (another person)
+- **Genre:** fiction and informal style
+- **Source:** uk.wikisource.org, «Твори в 20 томах», vol. II, «Мій злочин» (New York: Книгоспілка, 1956), https://uk.wikisource.org/wiki/Твори_(Франко,_1956–1962)/2/Мій_злочин
+- **Basis for publication:** public domain (the author died in 1916; the text is the author's original story, the fragment holds no editorial apparatus)
+- **Date of writing:** not later than 1916, the author's death — evidence: the work is printed in the 1956 edition above; the exact year is not claimed
+- **Fragment borders:** from «Ні, не видержу! Не можу довше видержати!» to «…чим більше силкуюся забути про нього, затерти його.» (the first two paragraphs of the story, after the title line)
+- **Blind word count:** 248 (by `words()`, before any run of the analyzer)
+- **Change log:** none planned
+
+### human-kotsiubynskyi-dorohoiu-tsinoiu
+
+- **Author:** Mykhailo Kotsiubynskyi (another person)
+- **Genre:** fiction and informal style
+- **Source:** uk.wikisource.org, «Твори в 2-х томах», vol. I, «Дорогою ціною» (New York: Книгоспілка, 1955), https://uk.wikisource.org/wiki/Твори_(Коцюбинський,_1955)/1/Дорогою_ціною
+- **Basis for publication:** public domain (the author died in 1913; the text is the author's original story, the fragment holds no editorial apparatus)
+- **Date of writing:** not later than 1913, the author's death — evidence: the work is printed in the 1955 edition above; the exact year is not claimed
+- **Fragment borders:** from «Діялось це в тридцятих роках минулого століття.» to «…рвалась гаряча уява й тягла за собою сотки й тисячі…» (the first two paragraphs after the title and the subtitle «Оповідання»)
+- **Blind word count:** 173 (by `words()`, before any run of the analyzer)
+- **Change log:** none planned
+
+### human-verkhovna-rada-konstytutsiia
+
+- **Author:** Verkhovna Rada of Ukraine (an official body)
+- **Genre:** technical and legal documents
+- **Source:** uk.wikisource.org, «Конституція України (1996)», the text as adopted on 28 June 1996, https://uk.wikisource.org/wiki/Конституція_України_(1996)
+- **Basis for publication:** official document outside copyright (Law of Ukraine «On Copyright and Related Rights», Art. 10: official documents of state bodies are not objects of copyright)
+- **Date of writing:** 28 June 1996 — evidence: adoption date in the same source; the original version, not a later amended one
+- **Fragment borders:** from «Верховна Рада України від імені Українського народу» to «…визнаються в Україні найвищою соціальною цінністю.» (the preamble and Articles 1–3, first paragraph of Article 3; one source line is one paragraph)
+- **Blind word count:** 152 (by `words()`, before any run of the analyzer)
+- **Change log:** none planned
 
 ## Refusals
 
-(no refusals yet)
+No candidate has been refused in the first batch. A refusal is recorded here in the refusal template format.
