@@ -69,18 +69,20 @@ python3 plugins/ukr-text-guard/skills/ukr-text-guard/scripts/analyze.py текс
 
 `evals/samples/` — тестові тексти (людські, ШІ, спроби обходу), `evals/run.sh` — прогін усіх зразків.
 
-| Зразок | Очікування | Індекс |
-|---|---|---|
-| human-story | людина | 7 |
-| human-business-letter | людина | 0 |
-| ai-cliche | ШІ | 58 |
-| ai-homoglyph-obfuscated | ШІ + обфускація | 83 |
-| ai-zero-width-obfuscated | ШІ + обфускація | 83 |
-| ai-chat-residue-placeholders | ШІ | 70 |
-| ai-engineered-humanity | ШІ під людину | 29 |
-| ai-prompted-human-style | ШІ під людину (межа) | 9 |
-| ai-website-stages-generic | ШІ | 44 |
-| ai-website-stages-2010-2015 | ШІ | 70 |
+| Зразок | Категорія | Очікувана смуга | Відомий пропуск | Індекс | Результат |
+|---|---|---|---|---|---|
+| ai-chat-residue-placeholders | ШІ | 26 або більше | ні | 70 |  |
+| ai-cliche | ШІ | 26 або більше | ні | 58 |  |
+| ai-engineered-humanity | ШІ | 26 або більше | ні | 29 |  |
+| ai-homoglyph-obfuscated | ШІ | 26 або більше | ні | 83 |  |
+| ai-prompted-human-style | ШІ | 26 або більше | так | 9 |  |
+| ai-website-stages-2010-2015 | ШІ | 26 або більше | ні | 70 |  |
+| ai-website-stages-generic | ШІ | 26 або більше | ні | 44 |  |
+| ai-zero-width-obfuscated | ШІ | 26 або більше | ні | 83 |  |
+| human-business-letter | людський | 25 або менше | ні | 0 |  |
+| human-story | людський | 25 або менше | ні | 7 |  |
+
+Усього 10 зразків: 2 людських і 8 ШІ.
 
 ```bash
 bash evals/run.sh
