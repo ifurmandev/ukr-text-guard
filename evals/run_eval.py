@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from collections import namedtuple
 from pathlib import Path
 
@@ -165,3 +166,119 @@ def analyze_sample(analyzer_path, sample_path):
         reason = "crashed: exit code %d" % done.returncode
         return Failure(reason + (", " + detail if detail else "")), hidden
     return _parse_result(done.stdout), hidden
+
+
+Row = namedtuple("Row", "name category known_gap outcome verdict hidden")
+
+
+def _gather(root, analyzer_path):
+    """Класифікує теку, застосовує known-gap, аналізує та оцінює кожен зразок за порядком назв."""
+    root = Path(root)
+    classified = classify_folder(root / "evals" / "samples")
+    entries = read_known_gaps(root / "evals" / "known-gaps.txt")
+    flagged, gap_errors = apply_known_gaps(entries, classified)
+    errors = [Error("eval.unclassified_sample", n, "file name starts with neither human- nor ai-")
+              for n in classified.unclassified]
+    errors += gap_errors
+    errors += [Error("eval.missing_category", c, "no samples in this category")
+               for c in missing_categories(classified)]
+    names = sorted([(n, "human") for n in classified.human] + [(n, "ai") for n in classified.ai])
+    rows = []
+    for name, category in names:
+        outcome, hidden = analyze_sample(
+            analyzer_path, root / "evals" / "samples" / (name + ".txt"))
+        known_gap = name in flagged
+        rows.append(Row(name, category, known_gap, outcome,
+                        judge(category, known_gap, outcome), hidden))
+    return classified, entries, flagged, errors, rows
+
+
+def _row_line(row):
+    label = "known-gap AI" if row.known_gap else ("human" if row.category == "human" else "AI")
+    head = "%-40s %-13s" % (row.name, label)
+    if isinstance(row.outcome, Failure):
+        return "%s analyzer failure: %s   failed" % (head, row.outcome.reason)
+    o = row.outcome
+    return "%s index %d   words %d   reliability %s   %s" % (
+        head, o.index, o.words, o.reliability, "passed" if row.verdict.passed else "failed")
+
+
+def render_report(plugin, gathered, duration):
+    """Збирає звіт у порядку розділів контракту; повертає (текст, failed)."""
+    classified, entries, flagged, errors, rows = gathered
+    errors = list(errors)
+    out = ["plugin: %s" % plugin]
+    out += [_row_line(r) for r in rows]
+
+    false_alarms = [r for r in rows if r.verdict.kind == "eval.false_alarm"]
+    misses = [r for r in rows if r.verdict.kind == "eval.miss"]
+    errors += [Error("eval.analyzer_failure", r.name, r.outcome.reason)
+               for r in rows if isinstance(r.outcome, Failure)]
+    if false_alarms:
+        out.append("")
+        out.append("false alarms (human samples above %d):" % HUMAN_MAX)
+        out += ["  false alarm: %s index %d" % (r.name, r.outcome.index) for r in false_alarms]
+    if misses:
+        out.append("")
+        out.append("misses (ordinary AI samples below %d):" % AI_MIN)
+        out += ["  miss: %s index %d" % (r.name, r.outcome.index) for r in misses]
+    if errors:
+        out.append("")
+        out.append("errors:")
+        out += ["  error %s: %s - %s" % (e.kind, e.item, e.reason) for e in errors]
+    reasons = dict(entries)
+    if flagged:
+        out.append("")
+        out.append("known-gap samples (excused by evals/known-gaps.txt):")
+        for name in sorted(flagged):
+            out.append("  known-gap: %s%s" % (name, "  # " + reasons[name] if reasons[name] else ""))
+
+    human_rows = [r for r in rows if r.category == "human"]
+    long_human = [r for r in human_rows
+                  if isinstance(r.outcome, Analysis) and r.outcome.words >= RELIABLE_WORDS]
+    inconclusive = bool(human_rows) and len(long_human) < len(human_rows)
+    notes = []
+    for r in rows:
+        if r.verdict.note == "drift":
+            notes.append("drift: %s index %d is above %d, still within the human band of %d"
+                         % (r.name, r.outcome.index, HUMAN_DRIFT_ABOVE, HUMAN_MAX))
+        elif r.verdict.note == "gap_may_be_closed":
+            notes.append("gap may be closed: %s index %d reaches the AI band of %d, review the label"
+                         % (r.name, r.outcome.index, AI_MIN))
+        if r.hidden:
+            notes.append("hidden characters: %s has a byte-order mark or invisible characters, "
+                         "a high index may come from the file rather than the text" % r.name)
+    if inconclusive:
+        notes.append("human conclusion inconclusive: only %d of %d human samples reach %d words"
+                     % (len(long_human), len(human_rows), RELIABLE_WORDS))
+    if notes:
+        out.append("")
+        out.append("notes:")
+        out += ["  " + n for n in notes]
+
+    ordinary = [r for r in rows if r.category == "ai" and not r.known_gap
+                and isinstance(r.outcome, Analysis)]
+    failed = bool(errors) or any(not r.verdict.passed for r in rows)
+    out.append("")
+    out.append("summary: %d human, %d AI, %d unclassified, %d ignored, %d of %d items"
+               % (len(classified.human), len(classified.ai), len(classified.unclassified),
+                  len(classified.ignored),
+                  len(classified.human) + len(classified.ai) + len(classified.unclassified)
+                  + len(classified.ignored), classified.total))
+    out.append("ordinary AI samples with index %d or more: %d of %d (for information)"
+               % (HIGH_LEVEL, sum(1 for r in ordinary if r.verdict.high_level), len(ordinary)))
+    out.append("human samples with %d words or more: %d of %d%s"
+               % (RELIABLE_WORDS, len(long_human), len(human_rows),
+                  ", human conclusion inconclusive" if inconclusive else ""))
+    if classified.ignored:
+        out.append("ignored: " + ", ".join(classified.ignored))
+    out.append("duration %.1f s" % duration)
+    out.append("result: %s" % ("failed" if failed else "passed"))
+    return "\n".join(out), failed
+
+
+def run_check(root, analyzer_path, plugin=DEFAULT_PLUGIN):
+    """Весь прогін: повертає (текст звіту, failed)."""
+    started = time.monotonic()
+    gathered = _gather(root, analyzer_path)
+    return render_report(plugin, gathered, time.monotonic() - started)

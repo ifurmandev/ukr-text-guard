@@ -286,5 +286,170 @@ class AnalyzeSampleTest(unittest.TestCase):
         self.assertFalse(hidden)
 
 
+FAKE_BY_NAME = '''import json, os, sys
+DATA = %r
+spec = DATA[os.path.basename(sys.argv[1])[:-4]]
+if spec == "crash":
+    sys.exit(3)
+index, words = spec
+print(json.dumps({"індекс": index,
+                  "надійність_статистики": "висока" if words >= 150 else "низька",
+                  "метрики": {"слів": words}}))
+'''
+
+
+class RunCheckTest(unittest.TestCase):
+    """The use case, run against a fake analyzer in a temporary repo root."""
+
+    def build(self, samples, gaps=None, extra_files=(), extra_dirs=()):
+        """samples: {file name without .txt: (index, words) | "crash" | (index, words, raw bytes)}"""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        folder = root / "evals" / "samples"
+        folder.mkdir(parents=True)
+        data = {}
+        for name, spec in samples.items():
+            raw = spec[2] if isinstance(spec, tuple) and len(spec) == 3 else b"text"
+            (folder / (name + ".txt")).write_bytes(raw)
+            data[name] = spec[:2] if isinstance(spec, tuple) else spec
+        for name in extra_files:
+            (folder / name).write_bytes(b"x")
+        for name in extra_dirs:
+            (folder / name).mkdir()
+        if gaps is not None:
+            (root / "evals" / "known-gaps.txt").write_text(gaps, encoding="utf-8")
+        analyzer = root / "analyze.py"
+        analyzer.write_text(FAKE_BY_NAME % (data,), encoding="utf-8")
+        return root, analyzer
+
+    def run_check(self, samples, **kw):
+        root, analyzer = self.build(samples, **kw)
+        return ev.run_check(root, analyzer, "ukr-text-guard")
+
+    def line_with(self, report, *parts):
+        for line in report.splitlines():
+            if all(p in line for p in parts):
+                return line
+        self.fail("no line with %r in:\n%s" % (parts, report))
+
+    def test_all_pass_lists_every_fact(self):
+        report, failed = self.run_check({
+            "human-a": (5, 200), "ai-b": (60, 300), "ai-c": (30, 120)})
+        self.assertFalse(failed)
+        self.assertIn("plugin: ukr-text-guard", report)
+        line = self.line_with(report, "human-a")
+        for fact in ("human", "5", "200", "висока", "passed"):
+            self.assertIn(fact, line)
+        line = self.line_with(report, "ai-b")
+        for fact in ("AI", "60", "300", "passed"):
+            self.assertIn(fact, line)
+        self.assertIn("result: passed", report)
+        self.assertIn("duration", report)
+
+    def test_high_level_count_is_informational(self):
+        report, failed = self.run_check({
+            "human-a": (5, 200), "ai-b": (60, 300), "ai-c": (30, 300), "ai-d": (51, 300)})
+        self.assertFalse(failed)
+        self.line_with(report, "ordinary AI", "51", "2 of 3")
+
+    def test_false_alarm_is_listed_and_fails(self):
+        report, failed = self.run_check({"human-a": (30, 200), "ai-b": (60, 300)})
+        self.assertTrue(failed)
+        self.line_with(report, "false alarm", "human-a", "30")
+        self.assertIn("result: failed", report)
+
+    def test_miss_is_listed_and_fails(self):
+        report, failed = self.run_check({"human-a": (5, 200), "ai-b": (10, 300)})
+        self.assertTrue(failed)
+        self.line_with(report, "miss", "ai-b", "10")
+
+    def test_notes_alone_never_fail(self):
+        report, failed = self.run_check({
+            "human-a": (20, 40),            # drift and inconclusive
+            "ai-b": (9, 300),               # known-gap, below the band
+            "ai-c": (40, 300)},             # known-gap, reaches the band
+            gaps="ai-b  # imitates\nai-c  # maybe closed\n")
+        self.assertFalse(failed)
+        self.line_with(report, "drift", "human-a")
+        self.line_with(report, "gap may be closed", "ai-c")
+        self.line_with(report, "inconclusive")
+        self.assertIn("result: passed", report)
+
+    def test_inconclusive_names_the_counts(self):
+        report, _ = self.run_check({
+            "human-a": (5, 200), "human-b": (5, 40), "ai-c": (60, 300)})
+        self.line_with(report, "150", "1 of 2", "inconclusive")
+
+    def test_conclusive_when_all_human_samples_are_long(self):
+        report, failed = self.run_check({"human-a": (5, 200), "ai-b": (60, 300)})
+        self.line_with(report, "150", "1 of 1")
+        self.assertNotIn("inconclusive", report)
+        self.assertFalse(failed)
+
+    def test_known_gap_list_shows_every_excused_sample(self):
+        report, _ = self.run_check({
+            "human-a": (5, 200), "ai-b": (9, 300), "ai-c": (60, 300)},
+            gaps="ai-b  # imitates human writing\n")
+        self.line_with(report, "known-gap", "ai-b", "imitates human writing")
+        self.line_with(report, "ai-b", "known-gap AI")
+
+    def test_flag_never_excuses_a_sample_without_an_entry(self):
+        report, failed = self.run_check({"human-a": (5, 200), "ai-b": (9, 300)})
+        self.assertTrue(failed)
+        self.line_with(report, "miss", "ai-b")
+
+    def test_analyzer_failure_shows_reason_not_an_index(self):
+        report, failed = self.run_check({
+            "human-a": "crash", "ai-b": (60, 300)})
+        self.assertTrue(failed)
+        line = self.line_with(report, "human-a", "crashed")
+        self.assertNotIn("index", line)
+        self.line_with(report, "eval.analyzer_failure", "human-a")
+
+    def test_bad_known_gap_entry_fails(self):
+        report, failed = self.run_check(
+            {"human-a": (5, 200), "ai-b": (60, 300)}, gaps="human-a\nai-zzz\n")
+        self.assertTrue(failed)
+        self.line_with(report, "eval.bad_known_gap", "human-a")
+        self.line_with(report, "eval.bad_known_gap", "ai-zzz")
+
+    def test_unclassified_and_ignored_items_are_counted(self):
+        report, failed = self.run_check(
+            {"human-a": (5, 200), "ai-b": (60, 300), "notes": (1, 1)},
+            extra_files=["readme.md"], extra_dirs=["sub"])
+        self.assertTrue(failed)
+        self.line_with(report, "eval.unclassified_sample", "notes")
+        self.line_with(report, "summary", "1 human", "1 AI", "1 unclassified",
+                       "2 ignored", "5 of 5")
+
+    def test_missing_category_fails(self):
+        report, failed = self.run_check({"ai-b": (60, 300)})
+        self.assertTrue(failed)
+        self.line_with(report, "eval.missing_category", "human")
+
+    def test_hidden_characters_note(self):
+        report, failed = self.run_check({
+            "human-a": (5, 200, b"\xef\xbb\xbfhello"), "ai-b": (60, 300)})
+        self.assertFalse(failed)
+        self.line_with(report, "hidden", "human-a", "file")
+
+    def test_two_reports_differ_only_in_the_duration_line(self):
+        samples = {"human-a": (20, 40), "ai-b": (9, 300), "ai-c": (60, 300)}
+        root, analyzer = self.build(samples, gaps="ai-b\n")
+        first, _ = ev.run_check(root, analyzer, "ukr-text-guard")
+        second, _ = ev.run_check(root, analyzer, "ukr-text-guard")
+
+        def stripped(text):
+            return [ln for ln in text.splitlines() if not ln.startswith("duration")]
+        self.assertEqual(stripped(first), stripped(second))
+
+    def test_samples_are_listed_in_sorted_order(self):
+        report, _ = self.run_check({
+            "human-b": (5, 200), "ai-z": (60, 300), "human-a": (5, 200), "ai-y": (60, 300)})
+        positions = [report.index(n) for n in ("ai-y", "ai-z", "human-a", "human-b")]
+        self.assertEqual(positions, sorted(positions))
+
+
 if __name__ == "__main__":
     unittest.main()
