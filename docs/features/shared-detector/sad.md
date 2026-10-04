@@ -1,7 +1,7 @@
 ---
 status: Draft
 owner: "Ihor Furman"
-reviewers: ["<Tech Lead>", "<Security Lead>"]
+reviewers: ["Tech Lead", "Security Lead"]
 updated_at: "2026-10-05"
 feature_size: "S"
 target_surfaces: [cli]
@@ -111,49 +111,53 @@ Each tactical decision in later sections should trace to one of these seeds. Tac
 
 ## 5. Building block view
 
-<!-- 🎯 Why: INTERNAL DECOMPOSITION — modules, containers, datastores. The static topology: who
-     may talk to whom. Without §5, §6 (the flows) has no vocabulary of participants.
-     📋 Write: 1 ¶ on the style (layered / hexagonal / clean / event-driven) + a folder tree + a
-     C4Container block.
-     📌 Draw ONE Container per declared `target_surface` (frontmatter): a fullstack
-     [backend-service, web-frontend] = a backend-API container + a web/SPA container; a
-     [backend-service, mobile-app] = the API + the mobile app. The Container(web, …) line below is
-     just one surface's container — swap/add per what was declared in §4. → _shared/surfaces.md
-     📌 e.g. «web app, content API, media worker, datastore, object store, CDN». -->
-
-<One paragraph: layered / hexagonal / clean / event-driven, and why.>
+There is no layering to speak of: the product is one Python command made of pure functions (read a tree, load the carry list, build a plan, render it, apply it) behind a thin argument parser, plus two short Bash callers. This matches the repository, where the only code beside the detector is the eval runner, a single script with pure judging functions and a thin `main`. The plan is a plain value, so the check, the sync and the tests all consume the same thing.
 
 **Internal decomposition:**
 
 ```
-<e.g. modules/<feature>/>
-├── domain/       <entities + sentinel errors>
-├── app/          <use cases / services>
-├── infra/        <repository + integration impl>
-├── ports/        <handlers, DTOs, error mapping>
-└── wiring        <self-wiring entry point>
+shared/                         the shared source (new)
+├── carry.json                  which plugin carries which shared file
+├── scripts/analyze.py
+└── references/                 ai-markers.md, lexicon.md, style-toolkit.md, syntax-figures.md
+tools/                          (new)
+├── shared_sync.py              check and sync: tree readers, carry list, plan, report, apply, exit codes
+└── tests/test_shared_sync.py   unit tests for the 4 divergence kinds and the guards, plus one test on a real temporary Git repository
+.githooks/pre-commit            Bash: runs `check --staged` before every commit (new)
+evals/run.sh                    Bash: runs `check` first, then the eval runner (extended)
+evals/run_eval.py, evals/tests/ unchanged
+plugins/<p>/skills/<p>/...      the plugin copies, on the same paths as before
 ```
 
-**C4 Container (L2):** <!-- syntax → references/c4-mermaid-syntax.md. Real names, no <placeholder> stubs. ONE Container per declared target_surface (frontmatter); the web container below is one example surface. -->
+**C4 Container (L2):**
 
 ```mermaid
 C4Container
-    title <feature> — Containers
+    title shared-detector — Containers
 
-    Person(actor, "<Actor>")
+    Person(author, "Plugin author", "Edits the shared source, runs sync and check, commits")
+    System_Ext(git, "Git", "Holds the index and runs the before-commit hook")
 
-    Container_Boundary(app, "<Our system>") {
-        Container(web, "<Web/UI>", "<technology>", "<purpose>")
-        Container(api, "<API/handler>", "<technology>", "<purpose>")
-        ContainerDb(db, "<Datastore>", "<technology>", "<purpose>")
+    Container_Boundary(repo, "Repository tooling") {
+        Container(cli, "shared_sync.py", "Python 3, standard library", "check and sync commands; reads trees, builds the plan, reports, rewrites diverged copies")
+        Container(hook, ".githooks/pre-commit", "Bash", "Runs check on the staged content before every commit")
+        Container(runsh, "evals/run.sh", "Bash", "Runs check first, then the eval runner; existing, extended")
+        Container(runner, "run_eval.py", "Python 3", "Measures samples against expected bands; unchanged")
+        ContainerDb(source, "Shared source and carry list", "Files under shared/", "Five shared files and carry.json")
+        ContainerDb(copies, "Plugin copies", "Files under plugins/", "Each plugin's copy of the shared files it carries")
     }
 
-    System_Ext(ext, "<External>", "<purpose>")
-
-    Rel(actor, web, "<interaction>", "<protocol>")
-    Rel(web, api, "<calls>")
-    Rel(api, db, "<reads/writes>", "<driver>")
-    Rel(api, ext, "<emits>", "<protocol>")
+    Rel(author, cli, "Runs check and sync")
+    Rel(author, runsh, "Runs the eval")
+    Rel(author, git, "Commits")
+    Rel(git, hook, "Runs before every commit")
+    Rel(hook, cli, "check --staged")
+    Rel(runsh, cli, "check, before any sample")
+    Rel(runsh, runner, "Runs when check passes")
+    Rel(cli, source, "Reads")
+    Rel(cli, copies, "Reads, rewrites diverged copies")
+    Rel(cli, git, "Reads the index", "git plumbing")
+    Rel(runner, copies, "Reads the guard copy of analyze.py")
 ```
 
 ## 6. Runtime view
