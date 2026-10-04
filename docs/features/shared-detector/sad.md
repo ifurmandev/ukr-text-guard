@@ -232,6 +232,68 @@ sequenceDiagram
     end
 ```
 
+**Critical flow 4: check on demand** (spec AC-03c, AC-04, AC-05, AC-06, AC-10, AC-12)
+
+```mermaid
+sequenceDiagram
+    actor Author
+    participant CLI as shared_sync.py
+    participant Source as Shared source and carry list
+    participant Copies as Plugin copies
+    Note over CLI,Copies: precondition: the check only reads, it writes no file in any branch
+    Author->>CLI: check
+    CLI->>Source: read the carry list and the shared files
+    alt the carry list has a wrong entry or the shared source holds a file no plugin carries
+        CLI-->>Author: names the wrong entry or the uncarried file, result failed, exit code 3
+    else the carry list is valid
+        CLI->>Copies: compare every carried copy byte for byte
+        CLI->>Copies: look for shared-path files the carry list does not give the plugin
+        alt every copy equals the shared source and nothing is missing or unlisted
+            CLI-->>Author: result passed, states how many files in how many plugins were compared, exit code 0
+        else a divergence exists
+            CLI-->>Author: names each file and plugin as differing, missing, unlisted or differing only in line endings or an invisible mark
+            CLI-->>Author: says copies are overwritten by the shared source, so a change made in a copy moves to the shared source before the sync
+            CLI-->>Author: result failed, exit code 3
+        end
+    else the check could not run
+        CLI-->>Author: error shared.cannot_run with the reason, exit code 4
+    end
+    Note over CLI,Copies: postcondition: no file changed
+```
+
+**Coverage of the spec (use-case and acceptance-criteria passes).**
+
+| User story | Flow |
+|---|---|
+| US-01 Fix a shared file once | 1 (the sync is the second half of editing in one place) |
+| US-02 Bring every plugin up to date | 1 |
+| US-03 Be told when copies differ | 4, 2, 3 |
+| US-04 Be told on every path that matters | 4 (on demand), 3 (eval), 2 (commit) |
+| US-05 Know who carries what | 4 (missing, unlisted, wrong carry list), 1 |
+| US-06 Not lose a change made in a copy | 1 and 4 (the overwrite notice, AC-10); the documents are non-runtime |
+| US-07 Keep installed plugins working | non-runtime, see AC-13 and AC-14 below |
+
+| AC | Shown by |
+|---|---|
+| AC-01, AC-02 | Flow 1, the valid-carry-list branch (rewritten or created, or all up to date) |
+| AC-03 | Flow 1, the wrong-entry branch |
+| AC-03b | Flow 1, the opt branch for an unlisted file |
+| AC-03c | Flow 4, the wrong-carry-list branch |
+| AC-04 | Flow 4, the passed branch |
+| AC-05, AC-12 | Flow 4, the divergence branch (the notice, and the line-endings and invisible-mark kinds) |
+| AC-06 | Flow 4, the divergence branch (missing and unlisted kinds) |
+| AC-07 | Flow 3 |
+| AC-08, AC-08b | Flow 2 |
+| AC-10 | Flow 1 (the sync overwrites only carried copies) and flow 4 (the copy is reported) |
+| AC-09, AC-11 | N/A, non-runtime: README and architecture-map text, verified by reading them |
+| AC-13 | N/A, non-runtime: a one-off acceptance run of the eval on each analyzer copy, compared with the committed table |
+| AC-14 | N/A, non-runtime: a one-off comparison of the plugin folders before and after the step (`git diff --stat`) |
+
+**Flags for `design` (not changed here).**
+
+- The four flows use the §5 container names as participants (`shared_sync.py`, `evals/run.sh`, …) instead of the generic vocabulary, to stay consistent with the three flows seeded by `design`. This is a deliberate exception: for a `cli` feature the containers of §5 are the participants.
+- No flow writes to a datastore, so there are no persist notes for `data-model`; the only state is files (§2). `data-model` has nothing to index.
+
 ## 7. Deployment view
 
 <!-- N/A: nothing is deployed, the tooling runs on the plugin author's machine -->
