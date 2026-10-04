@@ -162,31 +162,78 @@ C4Container
 
 ## 6. Runtime view
 
-<!-- 🎯 Why: the RUNTIME FLOW of 1–2 critical scenarios — who talks to whom, when, in what order.
-     Without §6, §5 is just boxes with no life.
-     📋 Write: a Mermaid sequenceDiagram. Participants are names from §5 (don't invent new ones).
-     Messages are semantic («saves a draft»), NO HTTP verbs / paths / status codes — endpoint-level
-     sequences arrive at the `api` stage.
-     📌 e.g. «author → web: composes draft → web → content API: save». Seed the primary flow(s) here;
-     the `sequences` stage then covers every §5 AC (no cap). Never N/A for M+; XS/S keeps ≥1 happy-path flow. -->
+Three flows are seeded here, one per entry point; the `sequences` stage then maps every acceptance criterion of the spec to a flow, a branch or an explicit N/A. Participants are the containers of §5.
 
-**Critical flow 1: <flow name>**
+**Critical flow 1: sync** (spec AC-01, AC-02, AC-03, AC-03b, AC-10)
 
 ```mermaid
 sequenceDiagram
-    actor Actor
-    participant Web
-    participant Service
-    participant Store
-    Actor->>Web: <action>
-    Web->>Service: <call>
-    Service->>Store: <write>
-    Store-->>Service: ok
-    Service-->>Web: result
-    Web-->>Actor: confirmation
+    actor Author
+    participant CLI as shared_sync.py
+    participant Source as Shared source and carry list
+    participant Copies as Plugin copies
+    Author->>CLI: sync
+    CLI->>Source: read the carry list and the shared files
+    alt a carry list entry is wrong
+        CLI-->>Author: names the wrong entry, nothing is written, result failed
+    else the carry list is valid
+        CLI->>Copies: compare every carried copy byte for byte
+        CLI->>Copies: rewrite or create each diverged or missing copy
+        Copies-->>CLI: written
+        CLI-->>Author: lists each file and plugin rewritten or created, or says all copies are up to date
+        opt a plugin holds a shared file the carry list does not give it
+            CLI-->>Author: lists it as left in place, delete by hand, and says the check still fails
+        end
+    end
 ```
 
-**Critical flow 2: <e.g. async event propagation>** — <if applicable, otherwise N/A>.
+**Critical flow 2: check before every commit** (spec AC-08, AC-08b)
+
+```mermaid
+sequenceDiagram
+    actor Author
+    participant Git
+    participant Hook as pre-commit hook
+    participant CLI as shared_sync.py
+    Author->>Git: commit
+    Git->>Hook: run before the commit
+    Hook->>CLI: check the staged content
+    CLI->>Git: read the index
+    Git-->>CLI: staged shared source, carry list and plugin copies
+    alt every copy equals the shared source
+        CLI-->>Hook: passed
+        Hook-->>Git: allow the commit
+    else a divergence exists
+        CLI-->>Hook: report naming each file and plugin
+        Hook-->>Git: refuse the commit
+        Git-->>Author: commit refused with the report
+    else the check could not run
+        Hook-->>Git: refuse the commit with the reason and the no-verify bypass
+        Git-->>Author: commit refused, the check could not run
+    end
+```
+
+**Critical flow 3: check at the start of the eval** (spec AC-07)
+
+```mermaid
+sequenceDiagram
+    actor Author
+    participant RunSh as evals/run.sh
+    participant CLI as shared_sync.py
+    participant Runner as run_eval.py
+    Author->>RunSh: run the eval
+    RunSh->>CLI: check the whole repository
+    alt every copy equals the shared source
+        CLI-->>RunSh: passed
+        RunSh->>Runner: run all samples
+        Runner-->>Author: report and exit code 0 or 1
+    else a divergence exists
+        CLI-->>RunSh: report naming each file and plugin
+        RunSh-->>Author: the eval did not run, the cause is a divergence, exit code 3
+    else the check could not run
+        RunSh-->>Author: the eval did not run, the check could not run, exit code 4
+    end
+```
 
 ## 7. Deployment view
 
