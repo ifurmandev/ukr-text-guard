@@ -237,25 +237,9 @@ sequenceDiagram
 
 ## 7. Deployment view
 
-<!-- 🎯 Why: the TOPOLOGY DevOps must know without reading the deploy charts — how many replicas,
-     where the background worker lives, AT WHAT NUMBERS we scale.
-     📋 Write: 2–3 sentences on topology + monitoring + concrete threshold numbers.
-     📌 e.g. «500 authors → partition by quarter» (not «we'll think about scale later»).
-     🎯 N/A allowed for XS/S that reuses an existing deployment unit with no change.
-     Deployment-diagram scaffold → templates/deployment.md. -->
+<!-- N/A: nothing is deployed, the tooling runs on the plugin author's machine -->
 
-<Topology in 2–3 sentences. Where it runs, replicas, scaling thresholds.>
-
-**Monitoring:**
-- <Metrics — e.g. `<metric_name>`>
-- <Alerts — e.g. «worker lag > 10 min → page on-call»>
-- <Tracing — e.g. spans on the request boundary>
-
-**Scaling thresholds:**
-- <e.g. comfortable in one table up to N rows/year>
-- <e.g. partition by quarter above N rows/year>
-
-<!-- For XS/S with no deployment change: <!-- N/A: reuses existing deployment unit, no infra change --> -->
+The tooling has no deployment unit of its own. It runs on the plugin author's machine on demand, at the start of the eval and before a commit, and it ships inside the repository like the eval runner. Monitoring is the output and the exit code of each run; no threshold applies, because one run reads about 20 files.
 
 ## 8. Crosscutting concepts
 
