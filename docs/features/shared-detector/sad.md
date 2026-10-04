@@ -257,17 +257,13 @@ The tooling has no deployment unit of its own. It runs on the plugin author's ma
 
 ## 9. Architecture decisions
 
-<!-- 🎯 Why: the REVERSE INDEX onto the adr/ folder. `ls adr/` gives the files; §9 gives the
-     semantics — why they exist, which SAD section they attach to, what status.
-     📋 Write: a 4-column table, one row per ADR. Mixed status is fine.
-     📌 e.g. «0001 | Store content as a table of typed blocks | Accepted | §4». -->
-
 | # | Title | Status | Section |
 |---|---|---|---|
-| <NNNN> | <imperative — e.g. "Use a sliding-window counter for rate limiting"> | Accepted | §<N> |
-| <NNNN> | <imperative — e.g. "Co-locate the worker in the API process"> | Accepted | §<N> |
+| 0001 | Read the staged content from the Git index in the before-commit check | Accepted | §4 |
+| 0002 | Ship the before-commit hook in a committed `.githooks` folder activated through `core.hooksPath` | Accepted | §4 |
+| 0003 | Mirror the in-skill paths under `shared/` and list the carriers in `shared/carry.json` | Accepted | §4 |
 
-ADR files live under `docs/features/<slug>/adr/NNNN-<title>.md`.
+ADR files live under `docs/features/shared-detector/adr/NNNN-<title>.md`.
 
 ## 10. Quality requirements
 
