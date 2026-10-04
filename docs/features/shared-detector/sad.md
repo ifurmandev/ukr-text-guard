@@ -307,13 +307,18 @@ Each top-3 goal from §1 expanded into a full scenario. Numbers are copied from 
 
 ## 12. Glossary
 
-<!-- 🎯 Why: ⭐ the DOMAIN GLOSSARY that ends arguments a year later («checkpoint — weekly or
-     biweekly? quarter — calendar or fiscal?»).
-     📋 Write: a term / meaning table. Business + technical terms mixed.
-     📌 e.g. «Lesson | a unit inside a course made of blocks (text, video)». -->
-
 | Term | Meaning |
 |---|---|
-| <e.g. domain object A> | <its meaning in this domain> |
-| <e.g. domain object B> | <its meaning> |
-| <e.g. domain invariant name> | <the rule, in plain language> |
+| Carry list | The list that says which plugins carry which shared file (`shared/carry.json`). Not what a plugin actually holds on disk; a difference between the two is a divergence. |
+| Divergence | A plugin copy that differs from the shared source, or is missing although the carry list requires it, or a file a plugin holds at the path of a shared file that the carry list does not give it. Not a band failure of the eval. |
+| Divergence check | The `check` command: fails when any divergence exists, names each file and plugin, and never changes a file. |
+| Plugin copy | The physical copy of a shared file inside one plugin, the one an installed plugin reads. Not the shared source. |
+| Shared file | A file that several plugins carry with identical content. Not the skill description file, which differs in every plugin. |
+| Shared source | The one editable reference version of the shared files (`shared/`), from which every plugin copy is made. Nothing installed reads it. |
+| Sync | The `sync` command: rewrites every diverged plugin copy from the shared source and lists what it rewrote. Not the divergence check. |
+| Plugin author | The person who maintains the marketplace plugins and runs the checks. Not a text author. |
+| Text author | The person who installs the plugins and checks or edits their own Ukrainian texts. Not a plugin author. |
+| Staged content | The versions of files in the Git index, which are the content about to be committed. Not the files in the working folder. Not yet in `CONTEXT.md`; a candidate for `/sdd:glossary`. |
+| Tree reader | The part of the tooling that lists paths and reads bytes of a tree, with one implementation for the working folder and one for the Git index (ADR-0001). A design term, not a domain term. |
+| Plan | The value that the core builds from the shared source, the carry list and a tree of plugin copies, and that the check and the sync both render. A design term, not a domain term. |
+
