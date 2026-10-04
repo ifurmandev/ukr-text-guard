@@ -267,29 +267,22 @@ ADR files live under `docs/features/shared-detector/adr/NNNN-<title>.md`.
 
 ## 10. Quality requirements
 
-<!-- 🎯 Why: the QUALITY TREE — take a goal from §1 and break it into concrete leaves: tests,
-     metrics, configs, drills. ⭐ Without §10, §1 is a manifesto. With §10 each declaration maps
-     to something PROVABLE.
-     📋 Write: per §1 goal — When / Then / How-verify. Numbers from spec §6 NFR VERBATIM (don't
-     round ≤250ms to ≤300ms — that's a critic F6 hit).
-     📌 e.g. «p95 ≤ 500 ms on a block update, verified by a 100 req/s load test». -->
+Each top-3 goal from §1 expanded into a full scenario. Numbers are copied from spec §6.
 
-Each top-3 goal from §1 expanded into a full scenario:
+**QG-1. Completeness of detection**
+- **When:** a plugin copy differs from the shared source, is missing although the carry list requires it, is a file at a shared path that the carry list does not give that plugin, or differs only in line endings.
+- **Then:** the check fails and names the file and the plugin; each of the 4 kinds is caught by at least 1 automated test.
+- **How verify:** one unit test per kind on an in-memory tree; one integration test on a real temporary Git repository for the index reader (ADR-0001), including a copy that is fixed in the working folder but staged with a divergence; tests of exit codes 3 and 4 for `evals/run.sh`.
 
-**QG-1. <quality attribute>**
-- **When:** <trigger condition>
-- **Then:** <expected behaviour with numbers from spec §6 NFR>
-- **How verify:** <test / chaos drill / load test / metric>
+**QG-2. Safety of writes**
+- **When:** the sync runs on the current files, and again right after a sync.
+- **Then:** the first sync on the current files rewrites 0 files; the second sync in a row rewrites 0 files; the sync writes only into copies named in the carry list.
+- **How verify:** a unit test that counts writes on an in-memory tree; a carry list entry such as `../x` makes the sync write nothing; the output of two runs in the repository.
 
-**QG-2. <quality attribute>**
-- **When:** <trigger>
-- **Then:** <expected>
-- **How verify:** <how>
-
-**QG-3. <quality attribute>**
-- **When:** <trigger>
-- **Then:** <expected>
-- **How verify:** <how>
+**QG-3. Unchanged behaviour and portability**
+- **When:** the step is complete and the tests and timings are run.
+- **Then:** 0 changed lines in the eval runner and in its unit tests; 74 of 74 existing unit tests pass; the check takes ≤ 2 s and the sync takes ≤ 2 s for 5 shared files in 3 plugins; it works with each of the 3 interpreters the eval entry point probes, as far as they are present, with 0 imports outside the standard library.
+- **How verify:** `git diff --stat` shows no change under `evals/run_eval.py` and `evals/tests/`; `python -m unittest discover evals/tests`; a timed standalone run on the plugin author's Windows shell with each present interpreter.
 
 ## 11. Risks and technical debt
 
