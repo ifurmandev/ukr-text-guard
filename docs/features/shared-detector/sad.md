@@ -286,22 +286,24 @@ Each top-3 goal from §1 expanded into a full scenario. Numbers are copied from 
 
 ## 11. Risks and technical debt
 
-<!-- 🎯 Why: ⭐ collects EVERYTHING that can break — not only the technical. Without §11 risks get
-     discussed at standups and lost; debt lives only in the head of whoever accepted it.
-     📋 Write: a risk/debt table — severity — mitigation — owner. Accepted debt in its own block.
-     📌 The first risk is often a product risk, not a technical one. That's normal. -->
-
-<!-- Severity literals: Low / Medium / High for regular risks; "Open question" for rows created by
-     a Save-as-OQ resolution during the Socratic walk (see references/socratic.md). -->
-
 | Risk / debt | Severity | Mitigation | Owner |
 |---|---|---|---|
-| <e.g. Worker lag may reach hours during a downstream outage> | Medium | <alert >10 min, on-call playbook, retry backoff> | <DevOps> |
-| <e.g. No event-schema versioning in v1> | Medium | <ADR-NNNN planned for v2, tolerate unknown fields> | <Backend> |
-| Open architectural decision: <decision-headline> | Open question | Resolve before <stage trigger or YYYY-MM-DD>; <inline rationale from the Save-as-OQ> | <owner> |
+| The sync silently erases a change the plugin author made directly in a plugin copy in order to measure it with the eval | Medium | The divergence report says copies are overwritten by the shared source (AC-05); the README and the architecture map name `shared/` as the place to edit (AC-11) | Plugin author |
+| The before-commit step is never set up, or is bypassed with `git commit --no-verify` | Medium | The on-demand check and the eval entry point still report; the README states this limit (AC-09) | Plugin author |
+| A direct run of `run_eval.py` skips the divergence check | Low | The README and the architecture map name `evals/run.sh` as the only checked eval path (AC-11) | Plugin author |
+| Under `core.autocrlf` (here `input`, the Git for Windows default `true`) the staged check and the working-folder check can disagree on line endings (consequence of ADR-0001) | Medium | A difference in line endings alone has its own code `shared.line_endings`; the README states which content each entry point judges; see the line-endings open question below | Plugin author |
+| `core.hooksPath` hides any other hook kept in `.git/hooks/` of that clone (consequence of ADR-0002) | Low | The README mentions it in the setup step | Plugin author |
+| Copies installed on text authors' machines stay old until plugin versions change | Medium | Outside this step (spec §3); see the versions open question below | Plugin author |
+| An interrupted sync leaves a short plugin copy | Low | The next check reports it and the next sync repairs it, because both are idempotent (§8) | Plugin author |
+| Open architectural decision: should the sync delete a file a plugin holds that the carry list does not give it | Open question | Resolve before `sdd:tasks`; now no: the check reports it and the plugin author deletes it, because a deletion cannot be undone by the sync | Ihor Furman |
+| Open architectural decision: should plugin versions change when a shared file changes | Open question | Resolve before the first release after this step; now no | Ihor Furman |
+| Open architectural decision: should a direct run of the eval runner also perform the divergence check | Open question | Resolve before `sdd:tasks`; now no, the runner stays unchanged (AC-11) | Ihor Furman |
+| Open architectural decision: should the repository pin line endings so that an editor setting cannot cause a divergence | Open question | Resolve before `sdd:tasks`; now no, a difference in line endings is reported as a divergence (AC-12) | Ihor Furman |
 
 **Accepted debt (acceptable in v1, plan to fix later):**
-- <e.g. the entity is immutable / unversioned — OK for v1, may need audit versioning in v2>
+- 12 physical copies of 5 files in 3 plugins remain, because an installed plugin is a copy of its own folder and symlinks are unreliable on Windows. The sync makes the duplication cheap to maintain; it does not remove it.
+- A plugin copy is written directly, without a temporary file.
+- The check proves that the copies in the repository are equal, not that the copies installed on text authors' machines are current.
 
 ## 12. Glossary
 
