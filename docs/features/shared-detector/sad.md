@@ -9,10 +9,6 @@ target_surfaces: [cli]
 
 # Software Architecture Document — shared-detector
 
-<!-- 12 Arc42 sections. Empty section → <!-- N/A: <one-line reason> -->. -->
-<!-- C4 Context (L1) lives inline in §3. C4 Container (L2) lives inline in §5. -->
-<!-- Numbers in §10 come VERBATIM from spec.md §6 NFR — no inventing, no rounding. -->
-
 ## 1. Introduction and goals
 
 **Intent.** The plugin author edits each shared file in one place (a shared source) and brings every plugin copy up to date in one run, with the run listing what it rewrote. Any divergence between a plugin copy and the shared source is reported, with the file and the plugin named, before the copies can be committed or measured by the eval. A text author who installs any of the three text plugins gets the same files on the same paths and the same detector results as before the step.
@@ -38,6 +34,7 @@ target_surfaces: [cli]
 - Bash for `evals/run.sh` and the before-commit step (Git Bash on Windows); Git 2.9 or newer, because the before-commit step is activated through `core.hooksPath`.
 - Layout convention of the repository: a plugin is `plugins/<name>/skills/<name>/`; the skill folder carries the shared files at fixed paths inside it (`scripts/`, `references/`).
 - No datastore: the only state is files in the repository.
+- No CI and no dependency manifest in the repository; nothing is installed to run the tooling.
 
 **Organisational.**
 - Size S: about 2 to 5 PRs, about one week.
@@ -45,7 +42,7 @@ target_surfaces: [cli]
 - One maintainer, who is also the reviewer: Ihor Furman, the plugin author.
 
 **Conventions.**
-- Commit prefixes `feat:`, `chore:`, `test:`, `docs:`; code, tests, test names and commit messages in English; the README and product texts in Ukrainian.
+- Commit prefixes as in `git log`: `feat`, `fix`, `chore`, `test`, `docs`, `design`, with a scope or without. Identifiers, test names and commit messages are in English; comments and docstrings are in Ukrainian, as in the existing `evals/run.sh` and `evals/run_eval.py`; the README and product texts are in Ukrainian.
 - Tests are `unittest` tests run with `python -m unittest discover <dir>`; the 74 existing tests in `evals/tests/` and the eval runner `evals/run_eval.py` are not changed.
 - Machine lines of the output follow the eval runner: `error <code>: <message>` and a final `result: <passed|failed>` line, in English.
 
@@ -56,7 +53,7 @@ target_surfaces: [cli]
 
 The marketplace ships three text plugins that each carry their own physical copy of the same shared files, because an installed plugin is a copy of its own folder. This feature adds the tooling that keeps those copies equal to one shared source: a sync that rewrites them, and a divergence check that fails when they differ. It sits between the plugin author and the plugin folders; the text author only sees its result, as unchanged plugins.
 
-<!-- brownfield: architecture-map.md (reflects_commit e6a83b1, plugins unchanged since): 4 plugins under plugins/, one skill each, no shared source, no CI, evals/run.sh as the only entry point of the eval -->
+<!-- brownfield: architecture-map.md (reflects_commit e6a83b1, plugins unchanged since): 4 plugins under plugins/, one skill each, no shared source, no CI, two entry points of the eval (`python evals/run_eval.py` and `bash evals/run.sh`), of which only `run.sh` will run the check -->
 
 **External systems (in / out):**
 
@@ -247,12 +244,12 @@ The tooling has no deployment unit of its own. It runs on the plugin author's ma
 |---|---|---|
 | Logging | None: no log file. A run prints its report to stdout and errors to stderr. | here |
 | Report format | English lines `error shared.<code>: <file> <plugin> <detail>` for each finding, ending with `result: passed` or `result: failed`. Codes: `shared.differing`, `shared.line_endings`, `shared.missing`, `shared.unlisted`, `shared.orphan_source`, `shared.carry_entry`, `shared.cannot_run`. The notice that copies are overwritten by the shared source is printed whenever a copy differs. | `evals/run_eval.py` (`eval.*` codes) |
-| Exit codes | `check`: 0 every copy equals the shared source and matches the carry list; 3 any divergence or a wrong carry list; 4 the check could not run. `sync`: 0 every copy equals the shared source after the run; 3 stopped by a wrong carry list, or an unlisted file remains; 4 could not run. Any unexpected exception is caught in `main` and exits 4, because the Python default 1 would be read by the eval as a failed band. | here |
+| Exit codes | `check`: 0 every copy equals the shared source and matches the carry list; 3 any divergence or a wrong carry list; 4 the check could not run. `sync`: 0 every copy equals the shared source after the run; 3 stopped by a wrong carry list, or an unlisted file or a shared file that no plugin carries remains (the sync validates both before it writes and never says «up to date» while either exists); 4 could not run. Any unexpected exception is caught in `main` and exits 4, because the Python default 1 would be read by the eval as a failed band. | here |
 | Error handling | Guard clauses return a finding, not an exception; the plan is a plain value that the report renders. | `evals/run_eval.py` |
 | Authentication / authorization | N/A. The only write boundary: the sync writes only to `plugins/<p>/skills/<p>/<shared path>` for entries of the carry list that passed validation; an absolute path, a path with `..` or one that leaves the plugin folder is rejected before anything is written. | spec §6.1 |
 | Paths and bytes | Paths in `carry.json` are relative with forward slashes. Files are read and written as bytes with no line-ending translation. A missing folder is created only inside the carrying plugin. | here |
 | Write order | The whole carry list is validated first, then written. Each copy is written directly. An interrupted run can leave a short copy; the next check reports it and the next sync repairs it, because both are idempotent. | here |
-| Interpreter lookup | `python3`, `python`, `py` in this order; the first that runs `-c "import sys"`. Identical in `evals/run.sh` and in the hook. | `evals/run.sh` |
+| Interpreter lookup | `python3`, `python`, `py` in this order; the first that runs `-c "import sys"`. Identical in `evals/run.sh` and in the hook. When none works, the extended `evals/run.sh` prints a message and exits 4 (today it exits 1, which the eval would read as a failed band), and the hook refuses the commit (AC-08b). | `evals/run.sh` |
 | ID strategy / events / internationalisation | N/A. The report is English like the eval report; the README is Ukrainian. | — |
 
 ## 9. Architecture decisions
@@ -275,9 +272,9 @@ Each top-3 goal from §1 expanded into a full scenario. Numbers are copied from 
 - **How verify:** one unit test per kind on an in-memory tree; one integration test on a real temporary Git repository for the index reader (ADR-0001), including a copy that is fixed in the working folder but staged with a divergence; tests of exit codes 3 and 4 for `evals/run.sh`.
 
 **QG-2. Safety of writes**
-- **When:** the sync runs on the current files, and again right after a sync.
-- **Then:** the first sync on the current files rewrites 0 files; the second sync in a row rewrites 0 files; the sync writes only into copies named in the carry list.
-- **How verify:** a unit test that counts writes on an in-memory tree; a carry list entry such as `../x` makes the sync write nothing; the output of two runs in the repository.
+- **When:** the sync runs on the current files, again right after a sync, and on a repository where a plugin holds a shared file that the carry list does not give it.
+- **Then:** the first sync on the current files rewrites 0 files; the second sync in a row rewrites 0 files; the sync writes only into copies named in the carry list; it deletes 0 files, leaves the unlisted file in place, exits 3 and does not say that all copies are up to date.
+- **How verify:** a unit test that counts writes on an in-memory tree; a carry list entry such as `../x` makes the sync write nothing; a test that an unlisted file survives the sync and the sync exits 3; the output of two runs in the repository.
 
 **QG-3. Unchanged behaviour and portability**
 - **When:** the step is complete and the tests and timings are run.
