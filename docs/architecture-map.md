@@ -21,7 +21,7 @@ frontend: ""
 ## Stack
 
 - Language / runtime: Python 3, standard library only (`html`, `json`, `re`, `statistics`, `sys`, `zipfile`, `collections`); `.docx` is read through `zipfile`, optional `python-docx` (`plugins/ukr-text-guard/skills/ukr-text-guard/scripts/analyze.py:1-12`)
-- Shell: one thin bash delegate, `evals/run.sh`, which finds a working Python and calls the runner
+- Shell: one thin bash delegate, `evals/run.sh`, which finds a working Python, runs the copy check (`tools/shared_sync.py check`) first and then calls the runner; one more tool, `tools/shared_sync.py` (`check`, `sync`, `check --staged`), and the `.githooks/pre-commit` hook
 - Frameworks: none. The product is Claude Code plugin content (SKILL.md prompts, reference markdown, one script), published through a marketplace manifest (`.claude-plugin/marketplace.json`)
 - Build / test / lint: **none exist** (no Makefile, no package or Python manifest, no CI workflow). The detector check is `python evals/run_eval.py` (or `bash evals/run.sh`): it judges every sample against an expected band, prints a report and exits 0 or 1; its own tests run with `python -m unittest discover evals/tests` (`evals/run_eval.py`, `evals/tests/test_run_eval.py`)
 
@@ -62,7 +62,7 @@ C4Container
 | ukr-text-detector | `plugins/ukr-text-detector/` | SKILL.md + 2 references + script | `.claude-plugin/plugin.json` | Detector only |
 | ukr-text-editor | `plugins/ukr-text-editor/` | SKILL.md + 3 references + script | `.claude-plugin/plugin.json` | Editor only |
 | ifurman-frontend-review | `plugins/ifurman-frontend-review/` | SKILL.md only | `.claude-plugin/plugin.json` | Review rules for an external site; unrelated to the text tools |
-| Evals | `evals/` | runner + delegate + known-gap list + unit tests + 10 samples | `evals/run_eval.py` (`main`), `evals/run.sh` | Classifies `evals/samples/*.txt` by the `human-` / `ai-` prefix, analyses each sample in a fresh process with the chosen plugin's copy of `analyze.py` (`--plugin`, default `ukr-text-guard`), judges it against the bands, excuses only the AI samples named in `evals/known-gaps.txt`, prints the report and exits 0 or 1 |
+| Evals | `evals/` | runner + delegate (runs the copy check first) + known-gap list + unit tests + 10 samples | `evals/run_eval.py` (`main`), `evals/run.sh` | Classifies `evals/samples/*.txt` by the `human-` / `ai-` prefix, analyses each sample in a fresh process with the chosen plugin's copy of `analyze.py` (`--plugin`, default `ukr-text-guard`), judges it against the bands, excuses only the AI samples named in `evals/known-gaps.txt`, prints the report and exits 0 or 1 |
 
 Each plugin holds exactly one skill, laid out as `plugins/<name>/.claude-plugin/plugin.json` and `plugins/<name>/skills/<name>/SKILL.md`.
 
@@ -91,22 +91,21 @@ Each plugin holds exactly one skill, laid out as `plugins/<name>/.claude-plugin/
 
 ## Where things live / closest precedents
 
-- A change to detection logic or scoring → `scripts/analyze.py` (scoring around lines 438-507, metrics around 395-435), currently **three byte-identical copies** (see debt below).
-- A change to a rule list or style guide → `references/*.md` in each plugin that carries the file.
-- A new check or sample → `evals/samples/<human|ai>-<descriptor>.txt`, then `bash evals/run.sh` (or `python evals/run_eval.py`); a bypass sample the detector is known to miss is added to `evals/known-gaps.txt`.
+- A change to detection logic or scoring → edit **`shared/scripts/analyze.py`** (scoring around lines 438-507, metrics around 395-435), then run `python tools/shared_sync.py sync`. The three plugin copies are overwritten by the shared source, so a direct edit of a copy is lost and reported by the check.
+- A change to a rule list or style guide → edit `shared/references/<file>.md`, then run the sync. `shared/carry.json` says which plugin carries which shared file.
+- Copy check → `python tools/shared_sync.py check` (working folder); `.githooks/pre-commit` runs `check --staged` (Git index) once `git config core.hooksPath .githooks` is set in the clone. `evals/run.sh` is the only eval path that performs the divergence check; a direct run of `evals/run_eval.py` does not.
+- A new check or sample → `evals/samples/<human|ai>-<descriptor>.txt`, then `bash evals/run.sh` (a direct `python evals/run_eval.py` skips the divergence check); a bypass sample the detector is known to miss is added to `evals/known-gaps.txt`.
 - A new plugin → a new `plugins/<name>/` tree modelled on `plugins/ukr-text-detector/` (smallest one) plus an entry in `.claude-plugin/marketplace.json`.
 
 ## Constraints & known tech-debt
 
-- **Duplicated files across plugins** (verified by hash at this commit):
-  - `scripts/analyze.py` (578 lines) is identical in guard, detector and editor.
-  - `references/syntax-figures.md` is identical in all three.
-  - `references/ai-markers.md` is identical in guard and detector.
-  - `references/lexicon.md` and `references/style-toolkit.md` are identical in guard and editor.
-  - The guard plugin is the superset. Any fix must be made in 2-3 places today.
+- **Duplicated files across plugins, now kept equal by a shared source** (`shared/`, ADR-0003):
+  - `scripts/analyze.py` is carried by guard, detector and editor; `references/syntax-figures.md` by all three; `references/ai-markers.md` by guard and detector; `references/lexicon.md` and `references/style-toolkit.md` by guard and editor (`shared/carry.json`).
+  - The copies still exist in each plugin, because an installed plugin cannot read outside its own folder. Edit only `shared/`, then run `python tools/shared_sync.py sync`; the check fails on any copy that differs byte for byte.
+  - The guard plugin is the superset.
 - **Marketplace installs copy each plugin folder**, so files outside a plugin directory are not available at run time; shared code cannot be referenced across plugins, each plugin needs its own physical copy. Symlinks are unreliable on Windows.
 - **Plugin names are already installed by users**: renaming or merging plugins breaks installs.
-- **The eval measures one detector copy per run** and does not prove the three copies identical; the README table still gives observed indices, not the expected bands.
+- **The eval measures one detector copy per run**; `bash evals/run.sh` is the only eval path that first checks that the three copies are identical (a direct `python evals/run_eval.py` does not); the README table still gives observed indices, not the expected bands.
 - **No CI and no dependency manifest**; the eval and its unit tests are run by hand.
 - **Eval human set is small**: 2 human and 8 AI samples (`evals/samples/`); the human samples are all by one author.
 

@@ -65,6 +65,31 @@ python3 plugins/ukr-text-guard/skills/ukr-text-guard/scripts/analyze.py текс
 python3 plugins/ukr-text-guard/skills/ukr-text-guard/scripts/analyze.py текст.txt --json
 ```
 
+Код аналізатора правте лише в `shared/scripts/analyze.py`, а копії в плагінах оновіть командою `python tools/shared_sync.py sync`. Прямі правки в копії перезапишуться.
+
+## Спільні файли
+
+П'ять файлів лежать у кількох плагінах: `scripts/analyze.py`, `references/ai-markers.md`, `references/lexicon.md`, `references/style-toolkit.md`, `references/syntax-figures.md`. Єдине джерело для них — папка `shared/`, де шляхи повторюють ті, що всередині скіла. Який плагін які файли несе, написано в `shared/carry.json`: це JSON, тож пояснення причин тут, а не в самому файлі. Плагін `ukr-text-detector` читає лише `ai-markers.md`, `syntax-figures.md` і скрипт, а `ukr-text-editor` — `lexicon.md`, `style-toolkit.md`, `syntax-figures.md` і скрипт; `ukr-text-guard` бере все.
+
+Порядок роботи: змінили файл у `shared/`, запустили синхронізацію, закомітили обидві сторони.
+
+```bash
+python tools/shared_sync.py check   # лише звіряє копії з shared/ у робочій папці, нічого не пише
+python tools/shared_sync.py sync    # переписує розбіжні копії з shared/, нічого не видаляє
+```
+
+Звіт `check` називає файл і плагін, а також нагадує, що копії перезаписуються джерелом. Файл, який плагін має, а `carry.json` йому не віддає, `sync` лишає на місці й просить видалити вручну.
+
+Перевірку перед комітом треба увімкнути один раз у кожному клоні:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Хук `.githooks/pre-commit` читає вміст індексу, тобто те, що саме потрапить у коміт, а не файли в робочій папці. Він зупиняє коміт і при розбіжності, і коли перевірка не змогла запуститись; свідомий обхід — `git commit --no-verify`. Без цього налаштування захищають лише команда `check` і `bash evals/run.sh`. Зауважте, що `core.hooksPath` підміняє всю папку хуків цього клону, тож інші хуки з `.git/hooks/` перестануть працювати.
+
+Які файли судить кожен вхід: хук — індекс, а `check` і `evals/run.sh` — робочу папку.
+
 ## Перевірка
 
 `evals/samples/` — тестові тексти (людські, ШІ, спроби обходу), `evals/run.sh` — прогін усіх зразків.
@@ -94,6 +119,8 @@ python3 plugins/ukr-text-guard/skills/ukr-text-guard/scripts/analyze.py текс
 ```bash
 bash evals/run.sh
 ```
+
+Єдиний шлях прогону, який спершу перевіряє копії спільних файлів, — `bash evals/run.sh`. Він перевіряє весь репозиторій, які б аргументи не отримав. Якщо копії розійшлися, прогін не стартує й завершується кодом 3; коли перевірку не вдалося запустити — кодом 4. Коди 0 і 1 лишаються за раннером. Прямий запуск `python evals/run_eval.py` перевірки не робить.
 
 ## Структура
 
