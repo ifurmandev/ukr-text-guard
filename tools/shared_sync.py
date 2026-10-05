@@ -48,6 +48,9 @@ class MemoryTree:
         self.files[path] = data
         self.written.append(path)
 
+    def require_inside_plugin(self, path: str) -> str:
+        return path  # у памʼяті посилань немає
+
 
 def copy_path(plugin: str, rel: str) -> str:
     return f"{PLUGINS_PREFIX}{plugin}/skills/{plugin}/{rel}"
@@ -196,17 +199,17 @@ class FolderTree:
 
     def write(self, path: str, data: bytes) -> None:
         """Байти як є, без перекладу кінців рядків; папки лише всередині плагіна."""
-        target = os.path.join(self.root, *path.split("/"))
-        self._require_inside_plugin(path, target)
+        target = self.require_inside_plugin(path)
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "wb") as handle:
             handle.write(data)
 
-
-    def _require_inside_plugin(self, path: str, target: str) -> None:
-        """Символьне посилання не має виводити запис за межі папки плагіна."""
+    def require_inside_plugin(self, path: str) -> str:
+        """Посилання (і на файл, і на саму папку плагіна) не виводить запис за межі плагіна."""
+        target = os.path.join(self.root, *path.split("/"))
         parts = path.split("/")
-        plugin_dir = os.path.realpath(os.path.join(self.root, parts[0], parts[1]))
+        # Якорем є розв'язана `plugins/`, а не папка плагіна: посилання на плагін теж має бути відхилене.
+        plugin_dir = os.path.join(os.path.realpath(os.path.join(self.root, parts[0])), parts[1])
         real = os.path.realpath(target)
         try:
             inside = os.path.commonpath([plugin_dir, real]) == plugin_dir
@@ -214,6 +217,7 @@ class FolderTree:
             inside = False
         if not inside:
             raise CannotRun(f"{path} resolves outside its plugin folder, nothing was written")
+        return target
 
 
 class IndexTree:
@@ -294,6 +298,9 @@ def sync_command(tree):
     stop = [f for f in plan.findings if f.code in STOP_CODES]
     if stop:
         return [finding_line(f) for f in stop] + ["result: failed"], 3
+    for f in plan.findings:
+        if f.code != "shared.unlisted":
+            tree.require_inside_plugin(copy_path(f.plugin, f.path))
     lines, unlisted = [], []
     for f in plan.findings:
         if f.code == "shared.unlisted":

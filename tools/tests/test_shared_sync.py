@@ -473,6 +473,41 @@ class SyncMainTest(unittest.TestCase):
         self.assertIn("error shared.cannot_run:", err)
         self.assertEqual(list(outside.iterdir()), [])
 
+    def test_sync_refuses_when_the_plugin_folder_itself_is_a_link(self):
+        write_tree(
+            self.root,
+            {
+                "shared/a.md": b"one",
+                "shared/carry.json": json.dumps({"a.md": ["p1"]}).encode("utf-8"),
+            },
+        )
+        outside = self._outside()
+        (outside / "skills" / "p1").mkdir(parents=True)
+        (outside / "skills" / "p1" / "SKILL.md").write_bytes(b"s")
+        self._link(self.root / "plugins" / "p1", outside, True)
+        code, out, err = run_main(["sync"], root=self.root)
+        self.assertEqual((code, out), (4, ""))
+        self.assertIn("error shared.cannot_run:", err)
+        self.assertFalse((outside / copy_path("p1", "a.md").split("/", 2)[2]).exists())
+
+    def test_refusal_on_a_later_copy_leaves_every_copy_unwritten(self):
+        write_tree(
+            self.root,
+            {
+                "shared/sub/a.md": b"one",
+                "shared/carry.json": json.dumps({"sub/a.md": ["p1", "p2"]}).encode("utf-8"),
+                "plugins/p1/skills/p1/SKILL.md": b"s",
+                "plugins/p2/skills/p2/SKILL.md": b"s",
+            },
+        )
+        outside = self._outside()
+        self._link(self.root / copy_path("p2", "sub"), outside, True)
+        code, out, err = run_main(["sync"], root=self.root)
+        self.assertEqual((code, out), (4, ""))
+        self.assertIn("nothing was written", err)
+        self.assertFalse((self.root / copy_path("p1", "sub/a.md")).exists())
+        self.assertEqual(list(outside.iterdir()), [])
+
     def test_failure_midway_still_reports_what_was_already_written(self):
         write_tree(
             self.root,
