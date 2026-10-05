@@ -2,6 +2,7 @@ import contextlib
 import io
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -425,6 +426,100 @@ class SyncMainTest(unittest.TestCase):
             code, out, err = run_main(["sync"], root=self.root)
         self.assertEqual((code, out), (4, ""))
         self.assertIn("error shared.cannot_run: denied", err)
+
+
+def git(root, *args):
+    return subprocess.run(
+        ["git", "-C", str(root), *args], check=True, capture_output=True
+    ).stdout
+
+
+class StagedCheckTest(unittest.TestCase):
+    """Інтеграційні тести на справжньому тимчасовому Git-репозиторії."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name)
+        git(self.root, "init", "-q")
+        write_tree(
+            self.root,
+            {
+                "shared/a.md": b"one",
+                "shared/carry.json": json.dumps({"a.md": ["p1", "p2"]}).encode("utf-8"),
+                copy_path("p1", "a.md"): b"one",
+                copy_path("p2", "a.md"): b"one",
+            },
+        )
+        git(self.root, "add", "-A")
+
+    def stage(self, rel, data):
+        write_tree(self.root, {rel: data})
+        git(self.root, "add", rel)
+
+    def test_staged_equal_passes(self):
+        code, out, err = run_main(["check", "--staged"], root=self.root)
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(out.splitlines(), ["checked 2 files in 2 plugins", "result: passed"])
+
+    def test_staged_divergence_fails_even_with_working_folder_fixed(self):
+        self.stage(copy_path("p1", "a.md"), b"two")
+        write_tree(self.root, {copy_path("p1", "a.md"): b"one"})  # робоча папка виправлена
+        code, out, _ = run_main(["check", "--staged"], root=self.root)
+        self.assertEqual(code, 3)
+        self.assertIn("error shared.differing: a.md p1", out)
+        self.assertEqual(run_main(["check"], root=self.root)[0], 0)
+
+    def test_staged_equal_passes_even_with_working_folder_diverged(self):
+        write_tree(self.root, {copy_path("p1", "a.md"): b"two"})  # лише в робочій папці
+        code, out, _ = run_main(["check", "--staged"], root=self.root)
+        self.assertEqual((code, out.splitlines()[-1]), (0, "result: passed"))
+        self.assertEqual(run_main(["check"], root=self.root)[0], 3)
+
+    def test_staged_shared_source_is_judged_as_staged(self):
+        self.stage("shared/a.md", b"newer")
+        write_tree(self.root, {"shared/a.md": b"one"})
+        code, out, _ = run_main(["check", "--staged"], root=self.root)
+        self.assertEqual(code, 3)
+        self.assertIn("error shared.differing: a.md p1", out)
+        self.assertIn("error shared.differing: a.md p2", out)
+
+    def test_staged_wrong_carry_entry_is_named(self):
+        self.stage("shared/carry.json", json.dumps({"a.md": ["p1", "p2"], "../x": ["p1"]}).encode("utf-8"))
+        code, out, _ = run_main(["check", "--staged"], root=self.root)
+        self.assertEqual(code, 3)
+        self.assertIn("error shared.carry_entry: ../x", out)
+
+    def test_untracked_file_is_not_in_the_index(self):
+        write_tree(self.root, {copy_path("p3", "a.md"): b"zzz"})  # не додано до індексу
+        code, _, _ = run_main(["check", "--staged"], root=self.root)
+        self.assertEqual(code, 0)
+
+    def test_path_with_spaces_and_non_ascii_is_kept_intact(self):
+        self.stage("shared/carry.json", json.dumps({"a.md": ["p1", "p2"]}).encode("utf-8"))
+        self.stage(copy_path("p1", "дані файл.txt"), b"x")
+        code, _, _ = run_main(["check", "--staged"], root=self.root)
+        self.assertEqual(code, 0)
+
+    def test_check_staged_changes_neither_working_folder_nor_index(self):
+        self.stage(copy_path("p1", "a.md"), b"two")
+        before_files = snapshot(self.root / "shared"), snapshot(self.root / "plugins")
+        before_index = git(self.root, "ls-files", "-s")
+        run_main(["check", "--staged"], root=self.root)
+        self.assertEqual((snapshot(self.root / "shared"), snapshot(self.root / "plugins")), before_files)
+        self.assertEqual(git(self.root, "ls-files", "-s"), before_index)
+
+    def test_not_a_git_repository_is_cannot_run(self):
+        with tempfile.TemporaryDirectory() as plain:
+            code, out, err = run_main(["check", "--staged"], root=plain)
+        self.assertEqual((code, out), (4, ""))
+        self.assertTrue(err.startswith("error shared.cannot_run: git index could not be read: "), err)
+
+    def test_git_missing_is_cannot_run(self):
+        with mock.patch.object(subprocess, "run", side_effect=FileNotFoundError("git")):
+            code, out, err = run_main(["check", "--staged"], root=self.root)
+        self.assertEqual((code, out), (4, ""))
+        self.assertTrue(err.startswith("error shared.cannot_run: git index could not be read: "), err)
 
 
 if __name__ == "__main__":

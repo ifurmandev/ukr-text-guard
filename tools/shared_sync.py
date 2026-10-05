@@ -3,6 +3,7 @@
 порівнюються побайтово. Лише стандартна бібліотека, Python 3.8+."""
 import json
 import os
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List
@@ -193,6 +194,35 @@ class FolderTree:
             handle.write(data)
 
 
+class IndexTree:
+    """Індекс Git: те, що буде закомічено. Нічого не копіює й не змінює."""
+
+    def __init__(self, root):
+        self.root = str(root)
+
+    def _git(self, *args: str) -> bytes:
+        try:
+            done = subprocess.run(
+                ["git", "-C", self.root, *args],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except OSError as exc:
+            raise CannotRun(f"git index could not be read: {exc}")
+        if done.returncode != 0:
+            reason = done.stderr.decode("utf-8", "replace").strip() or f"git exited with {done.returncode}"
+            raise CannotRun(f"git index could not be read: {reason}")
+        return done.stdout
+
+    def list_paths(self) -> List[str]:
+        raw = self._git("ls-files", "-z", "--", "shared", "plugins")
+        # -z лишає шляхи з пробілами й не-ASCII без лапок
+        return sorted(p.decode("utf-8") for p in raw.split(b"\x00") if p)
+
+    def read(self, path: str) -> bytes:
+        return self._git("cat-file", "blob", ":" + path)
+
+
 OVERWRITE_NOTICE = (
     "note: plugin copies are overwritten by the shared source (shared/); "
     "a change made in a copy must be moved to shared/ before running sync"
@@ -277,7 +307,7 @@ def main(argv=None, root=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     try:
         command, staged = parse_args(argv)
-        tree = FolderTree(root or default_root())
+        tree = (IndexTree if staged else FolderTree)(root or default_root())
         lines, code = (check_command if command == "check" else sync_command)(tree)
         for line in lines:
             print(line)
