@@ -13,6 +13,6 @@
 | T6 | `.githooks/pre-commit` | wiring | Ihor Furman | S | T5 | done |
 | T7 | `evals/run.sh` runs the check first | wiring | Ihor Furman | S | T3 | done |
 | T8 | README + architecture map | docs | Ihor Furman | S | T4, T6, T7 | done |
-| T9 | Acceptance run | tests | Ihor Furman | S | T1, T4, T7, T8 | todo |
+| T9 | Acceptance run | tests | Ihor Furman | S | T1, T4, T7, T8 | done |
 
 **Total:** 9 tasks, ~6 person-days (4 × M ≈ 1 day each, 5 × S ≈ 0.5 day each).
