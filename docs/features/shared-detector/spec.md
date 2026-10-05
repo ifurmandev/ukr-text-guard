@@ -2,7 +2,7 @@
 status: Draft
 owner: "Ihor Furman"
 reviewers: ["Tech Lead", "Security Lead"]
-updated_at: "2026-10-04"
+updated_at: "2026-10-05"
 feature_size: "S"
 ---
 
@@ -220,7 +220,7 @@ Sources: `docs/idea-brief.md` §6–§8, `docs/roadmap.md` step 4 and open decis
 
 ## 8. Open questions
 
-- [ ] Should the sync also delete a file a plugin holds that the carry list does not give it? Default now: no, the check reports it and the plugin author deletes it, because a deletion cannot be undone by the sync. — owner: Ihor Furman, due: before sdd:tasks
+- [x] Should the sync also delete a file a plugin holds that the carry list does not give it? **Resolved 2026-10-05: no.** The sync deletes nothing and only warns (AC-03b); the check reports the file and the plugin author deletes it, because a deletion cannot be undone by the sync. — owner: Ihor Furman
 - [ ] Should plugin versions change when a shared file changes, so that installed copies refresh? Default now: no, the versions stay as they are in this step. — owner: Ihor Furman, due: before the first release after this step
-- [ ] Should a direct run of the eval runner, which skips the shell entry point, later also perform the divergence check? Default now: no, the runner stays unchanged and the README and the architecture map name the shell entry point as the only checked path (AC-11). — owner: Ihor Furman, due: before sdd:tasks
-- [ ] Should the repository pin line endings so that an editor setting cannot cause a divergence? Default now: no, the check reports a difference in line endings as divergence (AC-12). — owner: Ihor Furman, due: before sdd:tasks
+- [x] Should a direct run of the eval runner, which skips the shell entry point, later also perform the divergence check? **Resolved 2026-10-05: no.** The check is not added to `run_eval.py`; it stays at three entry points (on demand, `evals/run.sh`, before every commit), and the README and the architecture map name the shell entry point as the only checked eval path (AC-11). — owner: Ihor Furman
+- [x] Should the repository pin line endings so that an editor setting cannot cause a divergence? **Resolved 2026-10-05: yes.** A committed `.gitattributes` sets `eol=lf` for `shared/` and for the paths of the plugin copies (`plugins/*/skills/*/scripts/analyze.py` and `plugins/*/skills/*/references/` for the four reference files). The check still reports a difference in line endings as divergence (AC-12): the pin makes it rare, it does not remove the kind. The pin changes no file content, because the shared files already use LF, so the first sync still rewrites nothing. — owner: Ihor Furman

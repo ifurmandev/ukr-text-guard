@@ -43,7 +43,7 @@ The before-commit step must judge the content that is about to be committed, not
 
 **Negative**
 - The index reader is code that depends on Git plumbing output (`ls-files -z`, `cat-file --batch`) and needs an integration test with a real repository.
-- Git converts line endings when it stages (`core.autocrlf`), so the staged content and the working-folder content can differ in line endings; the staged check and the on-demand check can then give different answers for the same copy. Recorded in §11.
+- Git converts line endings when it stages (`core.autocrlf`), so the staged content and the working-folder content can differ in line endings; the staged check and the on-demand check can then give different answers for the same copy. Recorded in §11. Mitigated on 2026-10-05 by a committed `.gitattributes` with `eol=lf` for the shared source and the plugin copy paths, so Git does not convert those files.
 
 **Neutral**
 - Switching to option 2 later means replacing the index reader with an extraction step; about one day of work.

@@ -10,7 +10,7 @@ Why this contract exists: one command keeps the plugin copies of the shared file
 python tools/shared_sync.py <command> [--staged]
 ```
 
-`<command>` is `check` or `sync`. The interpreter is the first of `python3`, `python`, `py` that runs `-c "import sys"` (sad §8). The repository root is the parent of `tools/` (the same rule `evals/run.sh` uses for its own folder); no `--root` flag exists.
+`<command>` is `check` or `sync`. The interpreter is the first of `python3`, `python`, `py` that runs `-c "import sys"` (sad §8). The repository root is the parent of the folder that holds the script, that is, the parent of `tools/`; the script finds it from its own location, not from the current working folder. `evals/run.sh` calls the script as `$here/../tools/shared_sync.py`, where `here` is the folder of `run.sh` itself (`evals/`), as it already does for `run_eval.py`. No `--root` flag exists.
 
 | Command | Flag | Reads | Writes | Spec |
 |---|---|---|---|---|
@@ -44,7 +44,7 @@ The last line is always `result: passed` or `result: failed`, except when the ru
 
 | Code | Command | Meaning | Spec |
 |---|---|---|---|
-| `shared.differing` | check, sync | a carried copy differs from the shared source. Also used when the only difference is an invisible mark (detail says so; F1 in the sync report) | AC-05, AC-12 |
+| `shared.differing` | check, sync | a carried copy differs from the shared source. Also used when the only difference is an invisible mark: the detail says «differs only in an invisible mark», and no separate code exists (decided 2026-10-05, F1 in the sync report) | AC-05, AC-12 |
 | `shared.line_endings` | check | the copy differs only in line endings | AC-12 |
 | `shared.missing` | check, sync | the carry list requires the file in the plugin; the plugin does not hold it. `sync` creates it and lists it as *created* | AC-06 |
 | `shared.unlisted` | check, sync | the plugin holds a file at the path of a shared file that the carry list does not give it. `sync` leaves it in place and lists it as «left in place, delete by hand» | AC-06, AC-03b |
@@ -131,7 +131,7 @@ Codes 1 and 2 are never produced by this command, so a caller can tell the three
 
 | Caller | Invocation | Reads exit code as |
 |---|---|---|
-| `evals/run.sh` (extended) | `check` on the whole repository, before any sample, whatever arguments `run.sh` received (AC-07) | 0 → run `run_eval.py` with the original arguments; 3 → print «the eval did not run, the cause is a divergence», exit 3; 4 → print «the eval did not run, the check could not run», exit 4. No interpreter found → message and exit 4 (today 1) |
+| `evals/run.sh` (extended) | `<interpreter> "$here/../tools/shared_sync.py" check` on the whole repository, before any sample, whatever arguments `run.sh` received (AC-07) | 0 → run `run_eval.py` with the original arguments; 3 → print «the eval did not run, the cause is a divergence», exit 3; 4 → print «the eval did not run, the check could not run», exit 4. No interpreter found → message and exit 4 (today 1) |
 | `.githooks/pre-commit` | `check --staged`, on every commit whatever files it touches (AC-08) | 0 → allow; 3 → refuse with the report; 4 or no interpreter → refuse, print the reason and «a conscious bypass is `git commit --no-verify`» (AC-08b) |
 | Plugin author | `check`, `sync` from the repository root | as above |
 

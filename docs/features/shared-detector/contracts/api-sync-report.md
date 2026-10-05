@@ -19,9 +19,9 @@ Size: S (`.size`), route `quick`.
 | overwrite notice wording | sad §8 + spec AC-05 (meaning fixed, wording proposed) | medium |
 | success line `checked N files in M plugins` | spec AC-04 (content fixed), line format proposed | medium |
 | sync lines `rewrote` / `created` / `left in place, delete by hand` / `all copies are up to date` | spec AC-01, AC-02, AC-03b (content fixed), line format proposed | medium |
-| repository root = parent of `tools/` | analogy to `evals/run.sh` `here`; not stated in sad | low |
+| repository root = parent of `tools/`; `run.sh` calls `$here/../tools/shared_sync.py` | analogy to `evals/run.sh` `here`; confirmed by the plugin author 2026-10-05 (the SAD does not state it, only this contract does) | high |
 | usage error → exit 4 | sad §8 «any unexpected exception → 4»; usage case inferred | low |
-| `invisible mark` reported as `shared.differing` | no code in sad §8 | low |
+| `invisible mark` reported as `shared.differing` | decided 2026-10-05 (OQ-1), written into sad §8 | high |
 
 ## B. Drift findings
 
@@ -32,29 +32,29 @@ Forward and back-feed checks; the interface kind has no database and no HTTP end
 | 1 | Command ↔ model *(core)* | ✓ | every command reads/writes only the files of sad §5 (shared source, carry list, plugin copies, Git index); `check` never writes |
 | 2 | Error code ↔ repo definition *(core)* | ✓ | no error registry exists for `shared.*`; the eval runner prints `eval.*` codes inline as strings, the same form. `shared.*` codes are the contract's proposal from sad §8 |
 | 3 | Validation ↔ constraint *(core)* | ✓ | path rules (relative, forward slashes, inside plugin folder) match sad §8 «Paths and bytes» and spec AC-03 |
-| 4 | Contract ↔ sequence *(supporting)* | ✗ → F2 | see flags |
+| 4 | Contract ↔ sequence *(supporting)* | ✓ (was ✗ → F2) | flow 1 now has the could-not-run branch (exit 4) |
 
 Back-feed coverage:
 
 - Every AC maps to a command or is N/A: AC-01..06, 08, 08b, 10, 12 → contract; AC-07 → *Callers* (`run.sh`); AC-09, 11, 13, 14 → N/A, non-runtime. ✓
 - Every command maps to a user story: `sync` → US-01, US-02, US-06; `check` → US-03, US-04, US-05, US-06; US-07 non-runtime. ✓
-- Every `alt` branch of flows 1–4 has an outcome in the contract. Flow 1 lacks one branch that the contract needs → F2.
+- Every `alt` branch of flows 1–4 has an outcome in the contract. Flow 1 lacked the could-not-run branch (F2); it was added to sad §6 on 2026-10-05.
 
 ## Flags (4) and resolution
 
 | # | Flag | Resolution |
 |---|---|---|
-| F1 | Sequence/design gap: flow 4 and AC-12 name «line endings or an invisible mark», but sad §8 has the code `shared.line_endings` only. | **Accept** in the contract: an invisible-mark-only difference is `shared.differing` with the detail saying so. **Save-as-OQ** → OQ-1, owner `design` (sad §8), due before the contract is finalized |
-| F2 | Sequence gap: flow 1 (sync) has no «could not run» branch, though sad §8 gives `sync` exit 4. | **Save-as-OQ** → OQ-2, owner `sequences` (sad §6 flow 1), due before the contract is finalized. The contract already carries exit 4 for `sync` |
-| F3 | Repository root is not stated in the SAD. | **Accept**: parent of `tools/`, as `run.sh` locates its own folder. No flag, no environment variable |
+| F1 | Sequence/design gap: flow 4 and AC-12 name «line endings or an invisible mark», but sad §8 has the code `shared.line_endings` only. | **Closed 2026-10-05** (OQ-1): an invisible-mark-only difference stays `shared.differing`, with the detail «differs only in an invisible mark». No new code. Written into sad §8 and the contract |
+| F2 | Sequence gap: flow 1 (sync) has no «could not run» branch, though sad §8 gives `sync` exit 4. | **Closed 2026-10-05** (OQ-2): the branch (`error shared.cannot_run`, exit 4) is added to sad §6 flow 1. The contract already carried exit 4 for `sync` |
+| F3 | Repository root is not stated in the SAD. | **Accept**: parent of the folder that holds the script (`tools/`), found from the script's own location. `evals/run.sh` calls `$here/../tools/shared_sync.py`. No flag, no environment variable |
 | F4 | Exact text of the success and sync lines is not fixed upstream (only their content). | **Accept** as the contract's proposal; the unit tests of `tools/tests/test_shared_sync.py` will pin the text |
 
 ## Open questions raised
 
-- **OQ-1** — Should an invisible-mark-only difference get its own code (for example `shared.invisible_mark`), or stay `shared.differing`? Owner: `design` (Ihor Furman), due: before the contract is finalized.
-- **OQ-2** — Add the «check could not run» branch (exit 4, `shared.cannot_run`) to sad §6 flow 1 (sync). Owner: `sequences` (Ihor Furman), due: before the contract is finalized.
+- **OQ-1** — closed 2026-10-05: the difference stays `shared.differing`, with the detail naming the invisible mark.
+- **OQ-2** — closed 2026-10-05: the «could not run» branch (exit 4, `shared.cannot_run`) is added to sad §6 flow 1 (sync).
 
-The four open questions already in spec §8 and sad §11 (deleting unlisted files, plugin versions, direct runner check, pinning line endings) are unchanged; this contract follows their stated defaults.
+Of the four open questions in spec §8 and sad §11, three are closed on 2026-10-05: the sync deletes nothing and only warns; the check is not added to `run_eval.py` (three entry points only); line endings are pinned through `.gitattributes` with `eol=lf` for `shared/` and the plugin copy paths. Only plugin versions stay open (owner: Ihor Furman, before the first release after this step); this contract follows its stated default (no change).
 
 ## Lint
 

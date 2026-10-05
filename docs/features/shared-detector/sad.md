@@ -98,7 +98,7 @@ C4Context
 **Top strategic choices (the seeds for ADRs):**
 
 1. **One plan, two commands.** The core builds a plan from three inputs: the shared source, the carry list and a tree of plugin copies. `check` renders the plan and never writes. `sync` validates the carry list first, then applies the plan, then renders it. Both use the same comparator, so the sync can never write something the check would still call a divergence, or call «up to date» something the check would fail. Serves quality goals 1 and 2.
-2. **Exact bytes.** Content is compared and written as bytes, with no normalisation of line endings or invisible marks (spec AC-12), and the sync never deletes a file, so an unlisted file is reported and left for the author (spec §8, first question). Serves quality goal 2.
+2. **Exact bytes.** Content is compared and written as bytes, with no normalisation of line endings or invisible marks (spec AC-12), and the sync never deletes a file, so an unlisted file is reported and left for the author (decided 2026-10-05, spec §8). A committed `.gitattributes` pins `eol=lf` for the shared source and the plugin copy paths, so an editor or `core.autocrlf` setting rarely causes a difference in line endings; the check still reports one when it happens. Serves quality goal 2.
 3. **Three entry points, one exit-code contract.** The on-demand command, `evals/run.sh` and the before-commit hook all call the same command and read the same codes: 0 equal, 3 divergence or wrong carry list, 4 the check could not run. A check that could not run is never read as a pass. The eval entry point stops before any sample on any non-zero code and ends with 3 or 4, never with the exit code 0 or 1 that the runner uses. Serves quality goals 1 and 3.
 4. **The before-commit step judges the staged content, not the working folder.** The core reads content through a tree reader with two implementations, the working folder and the Git index → [ADR-0001](adr/0001-read-staged-content-from-the-git-index.md). Serves quality goals 1 and 2.
 5. **The hook ships in the repository and is switched on once per clone.** A committed `.githooks/pre-commit` activated by `git config core.hooksPath .githooks` → [ADR-0002](adr/0002-ship-the-hook-in-githooks-with-core-hookspath.md). Serves quality goal 1 without adding a dependency (goal 3).
@@ -121,6 +121,7 @@ tools/                          (new)
 ├── shared_sync.py              check and sync: tree readers, carry list, plan, report, apply, exit codes
 └── tests/test_shared_sync.py   unit tests for the 4 divergence kinds and the guards, plus one test on a real temporary Git repository
 .githooks/pre-commit            Bash: runs `check --staged` before every commit (new)
+.gitattributes                  `eol=lf` for shared/ and the plugin copy paths: plugins/*/skills/*/scripts/analyze.py and the four references/ files (new)
 evals/run.sh                    Bash: runs `check` first, then the eval runner (extended)
 evals/run_eval.py, evals/tests/ unchanged
 plugins/<p>/skills/<p>/...      the plugin copies, on the same paths as before
@@ -171,7 +172,9 @@ sequenceDiagram
     participant Copies as Plugin copies
     Author->>CLI: sync
     CLI->>Source: read the carry list and the shared files
-    alt a carry list entry is wrong
+    alt the sync could not run
+        CLI-->>Author: error shared.cannot_run with the reason, exit code 4
+    else a carry list entry is wrong
         CLI-->>Author: names the wrong entry, nothing is written, result failed
     else the carry list is valid
         CLI->>Copies: compare every carried copy byte for byte
@@ -275,7 +278,7 @@ sequenceDiagram
 
 | AC | Shown by |
 |---|---|
-| AC-01, AC-02 | Flow 1, the valid-carry-list branch (rewritten or created, or all up to date) |
+| AC-01, AC-02 | Flow 1, the valid-carry-list branch (rewritten or created, or all up to date); the could-not-run branch (exit 4) has no AC of its own, it follows the exit-code contract of §8 |
 | AC-03 | Flow 1, the wrong-entry branch |
 | AC-03b | Flow 1, the opt branch for an unlisted file |
 | AC-03c | Flow 4, the wrong-carry-list branch |
@@ -305,11 +308,11 @@ The tooling has no deployment unit of its own. It runs on the plugin author's ma
 | Concept | Convention | Where defined |
 |---|---|---|
 | Logging | None: no log file. A run prints its report to stdout and errors to stderr. | here |
-| Report format | English lines `error shared.<code>: <file> <plugin> <detail>` for each finding, ending with `result: passed` or `result: failed`. Codes: `shared.differing`, `shared.line_endings`, `shared.missing`, `shared.unlisted`, `shared.orphan_source`, `shared.carry_entry`, `shared.cannot_run`. The notice that copies are overwritten by the shared source is printed whenever a copy differs. | `evals/run_eval.py` (`eval.*` codes) |
+| Report format | English lines `error shared.<code>: <file> <plugin> <detail>` for each finding, ending with `result: passed` or `result: failed`. Codes: `shared.differing`, `shared.line_endings`, `shared.missing`, `shared.unlisted`, `shared.orphan_source`, `shared.carry_entry`, `shared.cannot_run`. A copy that differs only in an invisible mark has no code of its own: it is `shared.differing` with the detail saying so (decided 2026-10-05). The notice that copies are overwritten by the shared source is printed whenever a copy differs. | `evals/run_eval.py` (`eval.*` codes) |
 | Exit codes | `check`: 0 every copy equals the shared source and matches the carry list; 3 any divergence or a wrong carry list; 4 the check could not run. `sync`: 0 every copy equals the shared source after the run; 3 stopped by a wrong carry list, or an unlisted file or a shared file that no plugin carries remains (the sync validates both before it writes and never says «up to date» while either exists); 4 could not run. Any unexpected exception is caught in `main` and exits 4, because the Python default 1 would be read by the eval as a failed band. | here |
 | Error handling | Guard clauses return a finding, not an exception; the plan is a plain value that the report renders. | `evals/run_eval.py` |
 | Authentication / authorization | N/A. The only write boundary: the sync writes only to `plugins/<p>/skills/<p>/<shared path>` for entries of the carry list that passed validation; an absolute path, a path with `..` or one that leaves the plugin folder is rejected before anything is written. | spec §6.1 |
-| Paths and bytes | Paths in `carry.json` are relative with forward slashes. Files are read and written as bytes with no line-ending translation. A missing folder is created only inside the carrying plugin. | here |
+| Paths and bytes | Paths in `carry.json` are relative with forward slashes. Files are read and written as bytes with no line-ending translation; `.gitattributes` pins `eol=lf` for the shared source and the plugin copy paths, so Git does not translate them on checkout or on staging. A missing folder is created only inside the carrying plugin. | here |
 | Write order | The whole carry list is validated first, then written. Each copy is written directly. An interrupted run can leave a short copy; the next check reports it and the next sync repairs it, because both are idempotent. | here |
 | Interpreter lookup | `python3`, `python`, `py` in this order; the first that runs `-c "import sys"`. Identical in `evals/run.sh` and in the hook. When none works, the extended `evals/run.sh` prints a message and exits 4 (today it exits 1, which the eval would read as a failed band), and the hook refuses the commit (AC-08b). | `evals/run.sh` |
 | ID strategy / events / internationalisation | N/A. The report is English like the eval report; the README is Ukrainian. | — |
@@ -350,14 +353,14 @@ Each top-3 goal from §1 expanded into a full scenario. Numbers are copied from 
 | The sync silently erases a change the plugin author made directly in a plugin copy in order to measure it with the eval | Medium | The divergence report says copies are overwritten by the shared source (AC-05); the README and the architecture map name `shared/` as the place to edit (AC-11) | Plugin author |
 | The before-commit step is never set up, or is bypassed with `git commit --no-verify` | Medium | The on-demand check and the eval entry point still report; the README states this limit (AC-09) | Plugin author |
 | A direct run of `run_eval.py` skips the divergence check | Low | The README and the architecture map name `evals/run.sh` as the only checked eval path (AC-11) | Plugin author |
-| Under `core.autocrlf` (here `input`, the Git for Windows default `true`) the staged check and the working-folder check can disagree on line endings (consequence of ADR-0001) | Medium | A difference in line endings alone has its own code `shared.line_endings`; the README states which content each entry point judges; see the line-endings open question below | Plugin author |
+| Under `core.autocrlf` (here `input`, the Git for Windows default `true`) the staged check and the working-folder check can disagree on line endings (consequence of ADR-0001) | Medium | `.gitattributes` pins `eol=lf` for the shared source and the plugin copy paths, which removes the usual cause; a difference in line endings that still appears has its own code `shared.line_endings`; the README states which content each entry point judges. Residual risk: a path missing from `.gitattributes` | Plugin author |
 | `core.hooksPath` hides any other hook kept in `.git/hooks/` of that clone (consequence of ADR-0002) | Low | The README mentions it in the setup step | Plugin author |
 | Copies installed on text authors' machines stay old until plugin versions change | Medium | Outside this step (spec §3); see the versions open question below | Plugin author |
 | An interrupted sync leaves a short plugin copy | Low | The next check reports it and the next sync repairs it, because both are idempotent (§8) | Plugin author |
-| Open architectural decision: should the sync delete a file a plugin holds that the carry list does not give it | Open question | Resolve before `sdd:tasks`; now no: the check reports it and the plugin author deletes it, because a deletion cannot be undone by the sync | Ihor Furman |
+| Decided 2026-10-05: the sync does not delete a file a plugin holds that the carry list does not give it | Closed | The sync deletes nothing and only warns; the check reports the file and the plugin author deletes it, because a deletion cannot be undone by the sync | Ihor Furman |
 | Open architectural decision: should plugin versions change when a shared file changes | Open question | Resolve before the first release after this step; now no | Ihor Furman |
-| Open architectural decision: should a direct run of the eval runner also perform the divergence check | Open question | Resolve before `sdd:tasks`; now no, the runner stays unchanged (AC-11) | Ihor Furman |
-| Open architectural decision: should the repository pin line endings so that an editor setting cannot cause a divergence | Open question | Resolve before `sdd:tasks`; now no, a difference in line endings is reported as a divergence (AC-12) | Ihor Furman |
+| Decided 2026-10-05: the divergence check is not added to `run_eval.py` | Closed | Three entry points only (on demand, `evals/run.sh`, before every commit); the runner stays unchanged and a direct run of it is unchecked, which the README and the architecture map state (AC-11) | Ihor Furman |
+| Decided 2026-10-05: the repository pins line endings through `.gitattributes` with `eol=lf` for `shared/` and the plugin copy paths | Closed | The check still reports a difference in line endings as a divergence (AC-12); the pin makes it rare | Ihor Furman |
 
 **Accepted debt (acceptable in v1, plan to fix later):**
 - 12 physical copies of 5 files in 3 plugins remain, because an installed plugin is a copy of its own folder and symlinks are unreliable on Windows. The sync makes the duplication cheap to maintain; it does not remove it.
