@@ -65,7 +65,7 @@ python3 plugins/ukr-text-guard/skills/ukr-text-guard/scripts/analyze.py текс
 python3 plugins/ukr-text-guard/skills/ukr-text-guard/scripts/analyze.py текст.txt --json
 ```
 
-Код аналізатора правте лише в `shared/scripts/analyze.py`, а копії в плагінах оновіть командою `python tools/shared_sync.py sync`. Прямі правки в копії перезапишуться.
+Код аналізатора правте лише в `shared/scripts/analyze.py`, а копії в плагінах оновіть командою `python tools/shared_sync.py sync`. Прямі правки в копії перезапишуться. Прогін eval, який спершу перевіряє копії, — лише `bash evals/run.sh`.
 
 ## Спільні файли
 
@@ -128,6 +128,9 @@ bash evals/run.sh
 .claude-plugin/marketplace.json   каталог
 plugins/<name>/.claude-plugin/plugin.json   маніфест плагіна
 plugins/<name>/skills/<name>/SKILL.md       сам скіл + references/ + scripts/
+shared/                                     єдине джерело спільних файлів і carry.json (правте тут)
+tools/                                      shared_sync.py (check, sync) і його тести
+.githooks/                                  pre-commit-хук, що запускає check --staged
 ```
 
 ## Ліцензія

@@ -5,7 +5,7 @@ updated_at: "2026-10-03"
 reflects_commit: "e6a83b1"
 language: "python3 (stdlib only)"
 build_cmd: ""
-test_cmd: "python -m unittest discover evals/tests"
+test_cmd: "python -m unittest discover evals/tests && python -m unittest discover tools/tests"
 lint_cmd: ""
 migration_tool: ""
 frontend: ""
@@ -23,7 +23,7 @@ frontend: ""
 - Language / runtime: Python 3, standard library only (`html`, `json`, `re`, `statistics`, `sys`, `zipfile`, `collections`); `.docx` is read through `zipfile`, optional `python-docx` (`plugins/ukr-text-guard/skills/ukr-text-guard/scripts/analyze.py:1-12`)
 - Shell: one thin bash delegate, `evals/run.sh`, which finds a working Python, runs the copy check (`tools/shared_sync.py check`) first and then calls the runner; one more tool, `tools/shared_sync.py` (`check`, `sync`, `check --staged`), and the `.githooks/pre-commit` hook
 - Frameworks: none. The product is Claude Code plugin content (SKILL.md prompts, reference markdown, one script), published through a marketplace manifest (`.claude-plugin/marketplace.json`)
-- Build / test / lint: **none exist** (no Makefile, no package or Python manifest, no CI workflow). The detector check is `python evals/run_eval.py` (or `bash evals/run.sh`): it judges every sample against an expected band, prints a report and exits 0 or 1; its own tests run with `python -m unittest discover evals/tests` (`evals/run_eval.py`, `evals/tests/test_run_eval.py`)
+- Build / test / lint: **none exist** (no Makefile, no package or Python manifest, no CI workflow). The detector check is `bash evals/run.sh`: it first runs the copy check, then the runner, which judges every sample against an expected band, prints a report and exits 0 or 1 (the shell entry point adds exit 3 for diverged copies and 4 when the check could not run; a direct `python evals/run_eval.py` skips the copy check). Tests: `python -m unittest discover evals/tests` for the runner (`evals/run_eval.py`, `evals/tests/test_run_eval.py`) and `python -m unittest discover tools/tests` for the sync tool, the hook and the shell entry point
 
 ## C4 — system as it is
 
@@ -72,7 +72,7 @@ Each plugin holds exactly one skill, laid out as `plugins/<name>/.claude-plugin/
 - **Skill definition:** SKILL.md with frontmatter `name` + `description` (long Ukrainian trigger prose) — `plugins/ukr-text-guard/skills/ukr-text-guard/SKILL.md:1-4`
 - **Script invocation:** relative `python3 scripts/analyze.py <file>` (also `-` for stdin, `--json`), no environment variables — `plugins/ukr-text-guard/skills/ukr-text-guard/SKILL.md:38-40`
 - **Error handling / IDs / persistence / migrations / inter-module communication:** not applicable; analysis is stateless and there is no datastore
-- **Tests:** `unittest` tests for the eval runner only (`evals/tests/test_run_eval.py`, run with `python -m unittest discover evals/tests`); the detector itself has none. Samples are named `human-*` or `ai-*` in kebab case, and the category comes from that prefix; the expected bands are named constants in `evals/run_eval.py` — `evals/samples/`
+- **Tests:** `unittest` tests for the eval runner (`evals/tests/test_run_eval.py`, run with `python -m unittest discover evals/tests`) and for the sync tool, the pre-commit hook and `evals/run.sh` (`tools/tests/`, run with `python -m unittest discover tools/tests`); the detector itself has none. Samples are named `human-*` or `ai-*` in kebab case, and the category comes from that prefix; the expected bands are named constants in `evals/run_eval.py` — `evals/samples/`
 - **Commits:** conventional prefixes (`feat:`, `chore:`, `test:`) — see `git log`
 - **Language:** product content and README are Ukrainian; JSON output keys of `analyze.py` are Ukrainian (`індекс`, `рівень`, `метрики`, `кліше`) with a few English metric names such as `MATTR`
 - **UI / styling:** none; no frontend in this repo
