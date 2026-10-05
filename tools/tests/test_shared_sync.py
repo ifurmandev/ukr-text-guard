@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import shutil
 import sys
 import tempfile
 import unittest
@@ -275,6 +276,155 @@ class CheckCommandTest(unittest.TestCase):
             code, out, err = run_main(["check"], root=self.root)
         self.assertEqual((code, out), (4, ""))
         self.assertIn("shared.cannot_run", err)
+
+
+class SyncCommandTest(unittest.TestCase):
+    carry = {"a.md": ["p1", "p2"]}
+
+    def sync(self, copies, carry=None, source=None):
+        tree = make_tree(source or {"a.md": b"one"}, copies)
+        for plugin in ("p1", "p2"):  # плагін існує як папка завжди
+            tree.files[copy_path(plugin, "SKILL.md")] = b"s"
+        tree.files["shared/carry.json"] = json.dumps(carry or self.carry).encode("utf-8")
+        lines, code = ss.sync_command(tree)
+        return tree, lines, code
+
+    def test_rewrites_diverged_and_creates_missing(self):
+        tree, lines, code = self.sync({("p1", "a.md"): b"old"})
+        self.assertEqual(code, 0)
+        self.assertEqual(lines, ["rewrote a.md p1", "created a.md p2", "result: passed"])
+        for plugin in ("p1", "p2"):
+            self.assertEqual(tree.files[copy_path(plugin, "a.md")], b"one")
+
+    def test_writes_only_the_diverged_copies(self):
+        tree, _, _ = self.sync({("p1", "a.md"): b"old", ("p2", "a.md"): b"one"})
+        self.assertEqual(tree.written, [copy_path("p1", "a.md")])
+
+    def test_second_run_writes_nothing(self):
+        tree, _, _ = self.sync({("p1", "a.md"): b"old"})
+        tree.written.clear()
+        lines, code = ss.sync_command(tree)
+        self.assertEqual((lines, code), (["all copies are up to date", "result: passed"], 0))
+        self.assertEqual(tree.written, [])
+
+    def test_up_to_date(self):
+        tree, lines, code = self.sync({("p1", "a.md"): b"one", ("p2", "a.md"): b"one"})
+        self.assertEqual((lines, code), (["all copies are up to date", "result: passed"], 0))
+        self.assertEqual(tree.written, [])
+
+    def test_wrong_carry_entry_writes_nothing(self):
+        tree, lines, code = self.sync({("p1", "a.md"): b"old"}, carry={"a.md": ["p1"], "../x": ["p1"]})
+        self.assertEqual(code, 3)
+        self.assertEqual(tree.written, [])
+        self.assertTrue(lines[0].startswith("error shared.carry_entry: ../x"))
+        self.assertEqual(lines[-1], "result: failed")
+
+    def test_orphan_source_writes_nothing(self):
+        tree, lines, code = self.sync(
+            {("p1", "a.md"): b"old"}, source={"a.md": b"one", "b.md": b"b"}, carry={"a.md": ["p1"]}
+        )
+        self.assertEqual((code, tree.written), (3, []))
+        self.assertIn("error shared.orphan_source: b.md no plugin carries this shared file", lines)
+
+    def test_unlisted_file_stays_and_sync_fails(self):
+        tree, lines, code = self.sync(
+            {("p1", "a.md"): b"old", ("p2", "a.md"): b"keep"}, carry={"a.md": ["p1"]}
+        )
+        self.assertEqual(code, 3)
+        self.assertEqual(
+            lines,
+            [
+                "rewrote a.md p1",
+                "left in place, delete by hand: a.md p2",
+                "error shared.unlisted: a.md p2 the check still fails until this file is deleted",
+                "result: failed",
+            ],
+        )
+        self.assertEqual(tree.files[copy_path("p2", "a.md")], b"keep")
+        self.assertNotIn("all copies are up to date", lines)
+
+    def test_unlisted_alone_never_says_up_to_date(self):
+        _, lines, code = self.sync(
+            {("p1", "a.md"): b"one", ("p2", "a.md"): b"one"}, carry={"a.md": ["p1"]}
+        )
+        self.assertEqual(code, 3)
+        self.assertNotIn("all copies are up to date", lines)
+
+    def test_nothing_is_deleted(self):
+        extra = {("p1", "other.txt"): b"x", ("p2", "a.md"): b"keep"}
+        tree = make_tree({"a.md": b"one"}, {("p1", "a.md"): b"old", **extra})
+        tree.files["shared/carry.json"] = json.dumps({"a.md": ["p1"]}).encode("utf-8")
+        before = set(tree.files)
+        ss.sync_command(tree)
+        self.assertTrue(before <= set(tree.files))
+
+    def test_sync_touches_nothing_outside_carried_copies(self):
+        tree, _, _ = self.sync({("p1", "a.md"): b"old", ("p1", "keep.txt"): b"k"})
+        self.assertEqual(tree.files[copy_path("p1", "keep.txt")], b"k")
+        self.assertEqual(
+            sorted(tree.written), [copy_path("p1", "a.md"), copy_path("p2", "a.md")]
+        )
+
+    def test_hand_edited_copy_is_overwritten_and_listed(self):
+        tree, lines, _ = self.sync({("p1", "a.md"): b"hand edit", ("p2", "a.md"): b"one"})
+        self.assertEqual(lines[0], "rewrote a.md p1")
+        self.assertEqual(tree.files[copy_path("p1", "a.md")], b"one")
+
+    def test_bytes_written_without_line_ending_translation(self):
+        crlf = b"one" + bytes([13, 10]) + b"two"
+        tree, _, _ = self.sync({}, source={"a.md": crlf}, carry={"a.md": ["p1"]})
+        self.assertEqual(tree.files[copy_path("p1", "a.md")], crlf)
+
+
+class SyncMainTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name)
+
+    def test_real_repository_copy_is_up_to_date_and_unchanged(self):
+        for top in ("shared", "plugins"):
+            shutil.copytree(REPO / top, self.root / top)
+        before = snapshot(self.root)
+        code, out, err = run_main(["sync"], root=self.root)
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(out.splitlines(), ["all copies are up to date", "result: passed"])
+        self.assertEqual(snapshot(self.root), before)
+
+    def test_folder_sync_creates_folders_inside_the_plugin_only(self):
+        write_tree(
+            self.root,
+            {
+                "shared/a/b.md": b"one",
+                "shared/carry.json": json.dumps({"a/b.md": ["p1"]}).encode("utf-8"),
+                "plugins/p1/skills/p1/SKILL.md": b"s",
+            },
+        )
+        code, out, _ = run_main(["sync"], root=self.root)
+        self.assertEqual(code, 0)
+        self.assertEqual(out.splitlines()[0], "created a/b.md p1")
+        self.assertEqual((self.root / copy_path("p1", "a/b.md")).read_bytes(), b"one")
+        self.assertEqual(
+            sorted(snapshot(self.root)),
+            sorted([
+                "shared/a/b.md", "shared/carry.json",
+                "plugins/p1/skills/p1/SKILL.md", copy_path("p1", "a/b.md"),
+            ]),
+        )
+
+    def test_write_failure_is_cannot_run(self):
+        write_tree(
+            self.root,
+            {
+                "shared/a.md": b"one",
+                "shared/carry.json": json.dumps({"a.md": ["p1"]}).encode("utf-8"),
+                "plugins/p1/skills/p1/SKILL.md": b"s",
+            },
+        )
+        with mock.patch.object(ss.FolderTree, "write", side_effect=PermissionError("denied")):
+            code, out, err = run_main(["sync"], root=self.root)
+        self.assertEqual((code, out), (4, ""))
+        self.assertIn("error shared.cannot_run: denied", err)
 
 
 if __name__ == "__main__":

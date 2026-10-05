@@ -35,12 +35,17 @@ class MemoryTree:
 
     def __init__(self, files: Dict[str, bytes]):
         self.files = files
+        self.written: List[str] = []  # шляхи, записані через write
 
     def list_paths(self) -> List[str]:
         return sorted(self.files)
 
     def read(self, path: str) -> bytes:
         return self.files[path]
+
+    def write(self, path: str, data: bytes) -> None:
+        self.files[path] = data
+        self.written.append(path)
 
 
 def copy_path(plugin: str, rel: str) -> str:
@@ -180,6 +185,13 @@ class FolderTree:
         with open(os.path.join(self.root, *path.split("/")), "rb") as handle:
             return handle.read()
 
+    def write(self, path: str, data: bytes) -> None:
+        """Байти як є, без перекладу кінців рядків; папки лише всередині плагіна."""
+        target = os.path.join(self.root, *path.split("/"))
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "wb") as handle:
+            handle.write(data)
+
 
 OVERWRITE_NOTICE = (
     "note: plugin copies are overwritten by the shared source (shared/); "
@@ -220,8 +232,36 @@ def check_command(tree):
     return render_check(plan), (3 if plan.findings else 0)
 
 
+STOP_CODES = ("shared.carry_entry", "shared.orphan_source")
+UNLISTED_NOTE = "the check still fails until this file is deleted"
+
+
+def sync_command(tree):
+    """Перевіряє весь carry-список, потім пише лише розбіжні копії; нічого не видаляє."""
+    plan = build_plan(tree, load_carry_from(tree))
+    stop = [f for f in plan.findings if f.code in STOP_CODES]
+    if stop:
+        return [finding_line(f) for f in stop] + ["result: failed"], 3
+    lines, unlisted = [], []
+    for f in plan.findings:
+        if f.code == "shared.unlisted":
+            unlisted.append(f)
+            continue
+        verb = "created" if f.code == "shared.missing" else "rewrote"
+        tree.write(copy_path(f.plugin, f.path), tree.read(SOURCE_PREFIX + f.path))
+        lines.append(f"{verb} {f.path} {f.plugin}")
+    if not lines and not unlisted:
+        lines.append("all copies are up to date")
+    for f in unlisted:
+        lines.append(f"left in place, delete by hand: {f.path} {f.plugin}")
+    for f in unlisted:
+        lines.append(finding_line(Finding(f.code, f.path, f.plugin, UNLISTED_NOTE)))
+    lines.append("result: failed" if unlisted else "result: passed")
+    return lines, 3 if unlisted else 0
+
+
 def parse_args(argv):
-    if len(argv) == 1 and argv[0] in ("check", "sync"):
+    if argv in (["check"], ["sync"]):
         return argv[0], False
     if argv == ["check", "--staged"]:
         return "check", True
@@ -237,9 +277,8 @@ def main(argv=None, root=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     try:
         command, staged = parse_args(argv)
-        if command != "check":
-            raise CannotRun(USAGE)
-        lines, code = check_command(FolderTree(root or default_root()))
+        tree = FolderTree(root or default_root())
+        lines, code = (check_command if command == "check" else sync_command)(tree)
         for line in lines:
             print(line)
         return code
