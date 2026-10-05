@@ -7,7 +7,7 @@
 |---|---|---|---|---|---|---|
 | T1 | Seed shared/, carry.json, .gitattributes | infra | Ihor Furman | S | — | done |
 | T2 | Plan core: reader interface, carry validation, comparator | domain | Ihor Furman | M | — | done |
-| T3 | `check` command, report, exit codes 0/3/4 | ports | Ihor Furman | M | T1, T2 | todo |
+| T3 | `check` command, report, exit codes 0/3/4 | ports | Ihor Furman | M | T1, T2 | done |
 | T4 | `sync` command | app | Ihor Furman | M | T2, T3 | todo |
 | T5 | Git index reader, `check --staged` | infra | Ihor Furman | M | T3 | todo |
 | T6 | `.githooks/pre-commit` | wiring | Ihor Furman | S | T5 | todo |

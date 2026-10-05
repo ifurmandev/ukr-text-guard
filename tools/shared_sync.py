@@ -2,6 +2,8 @@
 """Синхронізація спільних файлів: shared/ є єдиним джерелом, копії в плагінах
 порівнюються побайтово. Лише стандартна бібліотека, Python 3.8+."""
 import json
+import os
+import sys
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List
 
@@ -152,3 +154,99 @@ def build_plan(tree, carry) -> Plan:
                 )
     plan.plugins = len(carrying)
     return plan
+
+
+class CannotRun(Exception):
+    """Запуск неможливий: нечитаний файл, зіпсований carry.json, хибне виклик."""
+
+
+class FolderTree:
+    """Робоча папка: читає shared/ і plugins/ від кореня репозиторію."""
+
+    def __init__(self, root):
+        self.root = str(root)
+
+    def list_paths(self) -> List[str]:
+        found = []
+        for top in ("shared", "plugins"):
+            base = os.path.join(self.root, top)
+            for folder, _dirs, names in os.walk(base):
+                for name in names:
+                    rel = os.path.relpath(os.path.join(folder, name), self.root)
+                    found.append(rel.replace(os.sep, "/"))
+        return sorted(found)
+
+    def read(self, path: str) -> bytes:
+        with open(os.path.join(self.root, *path.split("/")), "rb") as handle:
+            return handle.read()
+
+
+OVERWRITE_NOTICE = (
+    "note: plugin copies are overwritten by the shared source (shared/); "
+    "a change made in a copy must be moved to shared/ before running sync"
+)
+NOTICE_CODES = ("shared.differing", "shared.line_endings", "shared.missing")
+USAGE = "usage: python tools/shared_sync.py check [--staged] | sync"
+
+
+def finding_line(finding: Finding) -> str:
+    who = " ".join(part for part in (finding.path, finding.plugin, finding.detail) if part)
+    return f"error {finding.code}: {who}"
+
+
+def render_check(plan: Plan) -> List[str]:
+    """Звіт check: рядки знахідок, застереження про перезапис, підсумок."""
+    if not plan.findings:
+        return [f"checked {plan.checked} files in {plan.plugins} plugins", "result: passed"]
+    lines = [finding_line(f) for f in plan.findings]
+    if any(f.code in NOTICE_CODES for f in plan.findings):
+        lines.append(OVERWRITE_NOTICE)
+    lines.append("result: failed")
+    return lines
+
+
+def load_carry_from(tree) -> Dict[str, List[str]]:
+    try:
+        carry = load_carry(tree.read(CARRY_FILE))
+    except (OSError, ValueError) as exc:
+        raise CannotRun(f"{CARRY_FILE} could not be read: {exc}")
+    if not isinstance(carry, dict):
+        raise CannotRun(f"{CARRY_FILE} must hold an object")
+    return carry
+
+
+def check_command(tree):
+    plan = build_plan(tree, load_carry_from(tree))
+    return render_check(plan), (3 if plan.findings else 0)
+
+
+def parse_args(argv):
+    if len(argv) == 1 and argv[0] in ("check", "sync"):
+        return argv[0], False
+    if argv == ["check", "--staged"]:
+        return "check", True
+    raise CannotRun(USAGE)
+
+
+def default_root() -> str:
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def main(argv=None, root=None) -> int:
+    """Коди виходу: 0 — гаразд, 3 — розбіжність, 4 — не вдалося запустити."""
+    argv = list(sys.argv[1:] if argv is None else argv)
+    try:
+        command, staged = parse_args(argv)
+        if command != "check":
+            raise CannotRun(USAGE)
+        lines, code = check_command(FolderTree(root or default_root()))
+        for line in lines:
+            print(line)
+        return code
+    except Exception as exc:  # CannotRun і будь-який збій — код 4, ніколи 1
+        print(f"error shared.cannot_run: {exc}", file=sys.stderr)
+    return 4
+
+
+if __name__ == "__main__":
+    sys.exit(main())
