@@ -1,6 +1,6 @@
 ---
 status: Living
-updated_at: "2026-10-04"
+updated_at: "2026-10-05"
 ---
 
 # Domain Context — shared-detector
@@ -20,4 +20,5 @@ lives in spec.md.
 - Plugin copy — the physical copy of a shared file inside one plugin, the one an installed plugin reads. NOT the shared source; the detector copy of the root glossary is the plugin copy of the analyzer file.
 - Shared file — a file that several plugins carry with identical content. NOT the skill description file, which differs in every plugin.
 - Shared source — the one editable reference version of the shared files, from which every plugin copy is made. NOT a plugin copy; nothing installed reads it.
+- Staged content — the versions of files in the Git index, which are the content about to be committed. NOT the files in the working folder, which may differ from what is staged.
 - Sync — rewriting every diverged plugin copy from the shared source and listing what was rewritten. NOT the divergence check, which only reports and never changes a file.
