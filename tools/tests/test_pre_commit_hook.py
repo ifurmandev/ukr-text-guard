@@ -92,14 +92,16 @@ class PreCommitHookTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0)
 
     def test_commit_touching_only_readme_still_runs_the_check(self):
-        git(self.root, "commit", "-q", "-m", "base", env=None, check=False)
+        self.assertEqual(self.commit().returncode, 0)  # чиста база
         path = self.root / PLUGIN_COPY
         path.write_bytes(path.read_bytes() + b"x")
         git(self.root, "add", PLUGIN_COPY)
+        git(self.root, "commit", "-q", "--no-verify", "-m", "diverge")  # розбіжність уже в HEAD
         (self.root / "README.md").write_text("r", encoding="utf-8")
-        git(self.root, "add", "README.md")
-        self.assertNotEqual(self.commit().returncode, 0)
-
+        git(self.root, "add", "README.md")  # у цьому коміті копія плагіна не змінюється
+        done = self.commit()
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("error shared.differing", done.stdout + done.stderr)
 
 if __name__ == "__main__":
     unittest.main()
