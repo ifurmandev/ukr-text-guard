@@ -486,8 +486,10 @@ class SyncMainTest(unittest.TestCase):
         (outside / "skills" / "p1" / "SKILL.md").write_bytes(b"s")
         self._link(self.root / "plugins" / "p1", outside, True)
         code, out, err = run_main(["sync"], root=self.root)
-        self.assertEqual((code, out), (4, ""))
-        self.assertIn("error shared.cannot_run:", err)
+        # junction: папку видно, відмова на запису (4); справжній symlink: os.walk її не бачить, плагін «відсутній» (3)
+        self.assertIn(code, (3, 4))
+        self.assertNotIn("created", out)
+        self.assertNotIn("rewrote", out)
         self.assertFalse((outside / copy_path("p1", "a.md").split("/", 2)[2]).exists())
 
     def test_refusal_on_a_later_copy_leaves_every_copy_unwritten(self):
