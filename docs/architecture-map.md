@@ -1,8 +1,8 @@
 ---
 status: current
 mode: current
-updated_at: "2026-10-03"
-reflects_commit: "e6a83b1"
+updated_at: "2026-10-05"
+reflects_commit: "a139bcf"
 language: "python3 (stdlib only)"
 build_cmd: ""
 test_cmd: "python -m unittest discover evals/tests && python -m unittest discover tools/tests"
@@ -21,7 +21,7 @@ frontend: ""
 ## Stack
 
 - Language / runtime: Python 3, standard library only (`html`, `json`, `re`, `statistics`, `sys`, `zipfile`, `collections`); `.docx` is read through `zipfile`, optional `python-docx` (`plugins/ukr-text-guard/skills/ukr-text-guard/scripts/analyze.py:1-12`)
-- Shell: one thin bash delegate, `evals/run.sh`, which finds a working Python, runs the copy check (`tools/shared_sync.py check`) first and then calls the runner; one more tool, `tools/shared_sync.py` (`check`, `sync`, `check --staged`), and the `.githooks/pre-commit` hook
+- Shell: one thin bash delegate, `evals/run.sh`, which finds a working Python, runs the copy check (`tools/shared_sync.py check`) first and then calls the runner, and the `.githooks/pre-commit` hook, which runs `check --staged`. The sync tool itself, `tools/shared_sync.py` (`check`, `sync`, `check --staged`), is Python, standard library only
 - Frameworks: none. The product is Claude Code plugin content (SKILL.md prompts, reference markdown, one script), published through a marketplace manifest (`.claude-plugin/marketplace.json`)
 - Build / test / lint: **none exist** (no Makefile, no package or Python manifest, no CI workflow). The detector check is `bash evals/run.sh`: it first runs the copy check, then the runner, which judges every sample against an expected band, prints a report and exits 0 or 1 (the shell entry point adds exit 3 for diverged copies and 4 when the check could not run; a direct `python evals/run_eval.py` skips the copy check). Tests: `python -m unittest discover evals/tests` for the runner (`evals/run_eval.py`, `evals/tests/test_run_eval.py`) and `python -m unittest discover tools/tests` for the sync tool, the hook and the shell entry point
 
@@ -39,7 +39,10 @@ C4Container
     Container(editor, "ukr-text-editor", "Plugin", "Editor only")
     Container(review, "ifurman-frontend-review", "Plugin", "Review rules for the ifurman.dev site")
     Container(analyze, "analyze.py", "Python 3", "Text in, index 0-100 and evidence out; copied into three plugins")
-    Container(evals, "evals", "Python runner + txt samples", "Judges every sample against its expected band, reports pass or fail, exits 0 or 1")
+    Container(evals, "evals", "Python runner + txt samples + bash delegate", "Judges every sample against its expected band, reports pass or fail, exits 0 or 1; run.sh adds exit 3 (copies diverged) and 4 (check could not run)")
+    Container(shared, "shared", "Files + carry.json", "The one place to edit the five shared files; carry.json says which plugin carries which")
+    Container(sync, "shared_sync", "Python 3", "check, sync and check --staged: compares plugin copies with shared/, exit 0, 3 or 4")
+    Container(hook, ".githooks/pre-commit", "bash", "Runs check --staged before every commit once core.hooksPath is set")
     Rel(writer, claude, "Uses")
     Rel(claude, market, "Reads plugin list")
     Rel(market, guard, "source")
@@ -51,6 +54,10 @@ C4Container
     Rel(editor, analyze, "Runs")
     Rel(author, evals, "Runs by hand")
     Rel(evals, analyze, "Calls the guard copy")
+    Rel(evals, sync, "Runs check first")
+    Rel(hook, sync, "Runs check --staged")
+    Rel(sync, shared, "Reads source and carry list")
+    Rel(sync, analyze, "Rewrites the plugin copies")
 ```
 
 ## Module inventory
@@ -62,6 +69,9 @@ C4Container
 | ukr-text-detector | `plugins/ukr-text-detector/` | SKILL.md + 2 references + script | `.claude-plugin/plugin.json` | Detector only |
 | ukr-text-editor | `plugins/ukr-text-editor/` | SKILL.md + 3 references + script | `.claude-plugin/plugin.json` | Editor only |
 | ifurman-frontend-review | `plugins/ifurman-frontend-review/` | SKILL.md only | `.claude-plugin/plugin.json` | Review rules for an external site; unrelated to the text tools |
+| Shared source | `shared/` | 4 reference files + `scripts/analyze.py` + `carry.json` | `shared/carry.json` (read by `tools/shared_sync.py`) | The one place to edit shared detector and rule files; `carry.json` lists the plugins that carry each file |
+| Sync tool | `tools/` | script + unit tests | `tools/shared_sync.py` (`main`), `evals/run.sh`, `.githooks/pre-commit` | `check` (working folder), `check --staged` (Git index) and `sync`; reports differing, missing, unlisted and line-ending-only copies, exits 0, 3 or 4; `sync` rewrites diverged copies and deletes nothing |
+| Pre-commit hook | `.githooks/` | bash | `git config core.hooksPath .githooks` (one-time per clone) | Refuses a commit whose staged content holds a diverged copy, and a commit when the check cannot run |
 | Evals | `evals/` | runner + delegate (runs the copy check first) + known-gap list + unit tests + 10 samples | `evals/run_eval.py` (`main`), `evals/run.sh` | Classifies `evals/samples/*.txt` by the `human-` / `ai-` prefix, analyses each sample in a fresh process with the chosen plugin's copy of `analyze.py` (`--plugin`, default `ukr-text-guard`), judges it against the bands, excuses only the AI samples named in `evals/known-gaps.txt`, prints the report and exits 0 or 1 |
 
 Each plugin holds exactly one skill, laid out as `plugins/<name>/.claude-plugin/plugin.json` and `plugins/<name>/skills/<name>/SKILL.md`.

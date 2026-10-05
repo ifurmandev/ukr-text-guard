@@ -40,7 +40,7 @@ Stdout carries the report; stderr carries only `shared.cannot_run` and usage tex
 error shared.<code>: <file> <plugin> <detail>
 ```
 
-The last line is always `result: passed` or `result: failed`, except when the run could not start (no interpreter — see *Callers*).
+The last line is always `result: passed` or `result: failed`, except on exit 4, where the run could not start or could not finish (no interpreter — see *Callers*; an unreadable copy, a malformed `carry.json`, a usage error, a failed write). Exit 4 prints `error shared.cannot_run: <reason>` on stderr and no `result:` line; a `sync` that stops after some writes first lists on stdout the copies it already rewrote or created.
 
 | Code | Command | Meaning | Spec |
 |---|---|---|---|
