@@ -1,0 +1,6 @@
+shared/** text eol=lf
+plugins/*/skills/*/scripts/analyze.py text eol=lf
+plugins/*/skills/*/references/ai-markers.md text eol=lf
+plugins/*/skills/*/references/lexicon.md text eol=lf
+plugins/*/skills/*/references/style-toolkit.md text eol=lf
+plugins/*/skills/*/references/syntax-figures.md text eol=lf
