@@ -166,6 +166,14 @@ class CannotRun(Exception):
     """Запуск неможливий: нечитаний файл, зіпсований carry.json, хибне виклик."""
 
 
+class SyncInterrupted(CannotRun):
+    """Запис урвався: `lines` — що вже переписано до збою."""
+
+    def __init__(self, reason, lines):
+        super().__init__(reason)
+        self.lines = lines
+
+
 class FolderTree:
     """Робоча папка: читає shared/ і plugins/ від кореня репозиторію."""
 
@@ -189,9 +197,23 @@ class FolderTree:
     def write(self, path: str, data: bytes) -> None:
         """Байти як є, без перекладу кінців рядків; папки лише всередині плагіна."""
         target = os.path.join(self.root, *path.split("/"))
+        self._require_inside_plugin(path, target)
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "wb") as handle:
             handle.write(data)
+
+
+    def _require_inside_plugin(self, path: str, target: str) -> None:
+        """Символьне посилання не має виводити запис за межі папки плагіна."""
+        parts = path.split("/")
+        plugin_dir = os.path.realpath(os.path.join(self.root, parts[0], parts[1]))
+        real = os.path.realpath(target)
+        try:
+            inside = os.path.commonpath([plugin_dir, real]) == plugin_dir
+        except ValueError:  # інший диск
+            inside = False
+        if not inside:
+            raise CannotRun(f"{path} resolves outside its plugin folder, nothing was written")
 
 
 class IndexTree:
@@ -278,7 +300,10 @@ def sync_command(tree):
             unlisted.append(f)
             continue
         verb = "created" if f.code == "shared.missing" else "rewrote"
-        tree.write(copy_path(f.plugin, f.path), tree.read(SOURCE_PREFIX + f.path))
+        try:
+            tree.write(copy_path(f.plugin, f.path), tree.read(SOURCE_PREFIX + f.path))
+        except Exception as exc:
+            raise SyncInterrupted(exc, lines)
         lines.append(f"{verb} {f.path} {f.plugin}")
     if not lines and not unlisted:
         lines.append("all copies are up to date")
@@ -313,6 +338,8 @@ def main(argv=None, root=None) -> int:
             print(line)
         return code
     except Exception as exc:  # CannotRun і будь-який збій — код 4, ніколи 1
+        for line in getattr(exc, "lines", []):
+            print(line)
         print(f"error shared.cannot_run: {exc}", file=sys.stderr)
     return 4
 

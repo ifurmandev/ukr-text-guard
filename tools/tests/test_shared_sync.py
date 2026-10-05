@@ -428,6 +428,77 @@ class SyncMainTest(unittest.TestCase):
         self.assertIn("error shared.cannot_run: denied", err)
 
 
+    def _carry_one(self, rel):
+        write_tree(
+            self.root,
+            {
+                f"shared/{rel}": b"one",
+                "shared/carry.json": json.dumps({rel: ["p1"]}).encode("utf-8"),
+                "plugins/p1/skills/p1/SKILL.md": b"s",
+            },
+        )
+
+    def _outside(self):
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        return Path(outside.name)
+
+    def _link(self, link, target, directory):
+        link.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            link.symlink_to(target, target_is_directory=directory)
+        except (OSError, NotImplementedError):
+            if directory and sys.platform == "win32":  # junction не потребує привілеїв
+                done = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], capture_output=True)
+                if done.returncode == 0:
+                    return
+            self.skipTest("symlinks are not available here")
+
+    def test_sync_refuses_to_write_through_a_symlinked_copy(self):
+        self._carry_one("a.md")
+        outside = self._outside()
+        (outside / "t.md").write_bytes(b"precious")
+        self._link(self.root / copy_path("p1", "a.md"), outside / "t.md", False)
+        code, out, err = run_main(["sync"], root=self.root)
+        self.assertEqual((code, out), (4, ""))
+        self.assertIn("error shared.cannot_run:", err)
+        self.assertEqual((outside / "t.md").read_bytes(), b"precious")
+
+    def test_sync_refuses_to_create_through_a_symlinked_folder(self):
+        self._carry_one("sub/a.md")
+        outside = self._outside()
+        self._link(self.root / copy_path("p1", "sub"), outside, True)
+        code, out, err = run_main(["sync"], root=self.root)
+        self.assertEqual((code, out), (4, ""))
+        self.assertIn("error shared.cannot_run:", err)
+        self.assertEqual(list(outside.iterdir()), [])
+
+    def test_failure_midway_still_reports_what_was_already_written(self):
+        write_tree(
+            self.root,
+            {
+                "shared/a.md": b"one",
+                "shared/carry.json": json.dumps({"a.md": ["p1", "p2"]}).encode("utf-8"),
+                "plugins/p1/skills/p1/SKILL.md": b"s",
+                "plugins/p2/skills/p2/SKILL.md": b"s",
+            },
+        )
+        real_write = ss.FolderTree.write
+        calls = []
+
+        def flaky(tree, path, data):
+            calls.append(path)
+            if len(calls) == 2:
+                raise PermissionError("denied")
+            return real_write(tree, path, data)
+
+        with mock.patch.object(ss.FolderTree, "write", flaky):
+            code, out, err = run_main(["sync"], root=self.root)
+        self.assertEqual(code, 4)
+        self.assertEqual(out.splitlines(), ["created a.md p1"])
+        self.assertIn("error shared.cannot_run: denied", err)
+
+
 def git(root, *args):
     return subprocess.run(
         ["git", "-C", str(root), *args], check=True, capture_output=True
