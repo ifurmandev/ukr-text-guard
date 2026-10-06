@@ -30,7 +30,7 @@ python tools/shared_sync.py <command> [--staged]
 | Carry list | `shared/carry.json` | object `{ "<in-skill path>": ["<plugin>", ...], ... }` — keys are relative paths with forward slashes; plugin names are folder names under `plugins/` (ADR-0003) |
 | Plugin copies | `plugins/<p>/skills/<p>/<in-skill path>` | compared and written as bytes, no line-ending translation (AC-12, sad §8) |
 
-Carry-list entry validation (before anything is written): the key names a file the shared source holds; each plugin is a folder under `plugins/`; the target stays inside that plugin folder by its text (no absolute path, no `..`). A failure is `shared.carry_entry` (AC-03, AC-03c). A target that leaves the plugin folder only through a symbolic link or junction on disk (on the copy, on a sub-folder, or on the plugin folder itself) is not a carry-list error: `sync` refuses it with `shared.cannot_run`, exit 4, after checking every target and before writing the first one, so nothing is written (AC-10). A shared file no plugin carries is `shared.orphan_source` (AC-03c).
+Carry-list entry validation (before anything is written): the key names a file the shared source holds; each plugin is a folder under `plugins/`; the target stays inside that plugin folder by its text (no absolute path, no `..`). A failure is `shared.carry_entry` (AC-03, AC-03c). A target that leaves the plugin folder only through a link on disk is not a lexical carry-list error. A symbolic link or junction on the copy or on a sub-folder, and a junction on the plugin folder itself, is refused by `sync` with `shared.cannot_run`, exit 4, after checking every target and before writing the first one, so nothing is written (AC-10). A symbolic link on the plugin folder itself is not seen by the working-folder reader (it does not follow links), so that plugin counts as missing and `sync` stops with `shared.carry_entry`, exit 3, before any write; nothing is written either (AC-03, AC-10). A shared file no plugin carries is `shared.orphan_source` (AC-03c).
 
 ## Output
 
@@ -142,7 +142,7 @@ The hook is switched on once per clone with `git config core.hooksPath .githooks
 - `check` changes no file in any branch (AC-12, flow 4 pre/postcondition).
 - `sync` is idempotent: the first run on the current files and the second run in a row rewrite 0 files (spec §6).
 - `sync` validates the whole carry list first, then writes; a wrong entry means 0 files written (AC-03).
-- `sync` checks every target (including links on disk) before the first write; a target that resolves outside its plugin folder means 0 files written and exit 4 (AC-10).
+- `sync` checks every target (including links on disk) before the first write; a target that resolves outside its plugin folder means 0 files written and exit 4, except a symbolic link on the plugin folder itself, which gives `shared.carry_entry`, exit 3, and also 0 files written (AC-03, AC-10).
 - `sync` writes only to carried plugin copies; a missing folder is created only inside the carrying plugin; no file is ever deleted (AC-10, AC-03b).
 - `sync` never prints «all copies are up to date» while an unlisted file or an uncarried shared file exists.
 - Each command takes ≤ 2 s for 5 shared files in 3 plugins (spec §6).
