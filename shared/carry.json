@@ -1,0 +1,7 @@
+{
+  "scripts/analyze.py": ["ukr-text-guard", "ukr-text-detector", "ukr-text-editor"],
+  "references/syntax-figures.md": ["ukr-text-guard", "ukr-text-detector", "ukr-text-editor"],
+  "references/ai-markers.md": ["ukr-text-guard", "ukr-text-detector"],
+  "references/lexicon.md": ["ukr-text-guard", "ukr-text-editor"],
+  "references/style-toolkit.md": ["ukr-text-guard", "ukr-text-editor"]
+}

@@ -22,7 +22,7 @@ The plugin author and Ukrainian-language writers can see from a measured eval ho
 | 1 | Run the eval against expected score ranges fixed before the run, and get a pass/fail report that lists false alarms on human texts and keeps bypass samples as known-gap → [spec](features/ukr-text-eval/spec.md) | `idea-brief.md` §7 Recommendation | S | shipped |
 | 2 | Show the eval table in the README with expected ranges and known-gap status, so users see measured quality | `idea-brief.md` §7 Recommendation | XS | shipped |
 | 3 | Broaden the human sample set across genres and authors, to reduce the one-voice risk → [spec](features/human-corpus/spec.md) | `idea-brief.md` §6 Risks | S | shipped |
-| 4 | Keep one reference copy of the shared detector files, copy it into each plugin by script, and fail the check when copies diverge | `idea-brief.md` §7 Recommendation | S | idea |
+| 4 | Keep one reference copy of the shared detector files, copy it into each plugin by script, and fail the check when copies diverge → [spec](features/shared-detector/spec.md) · [PR #4](https://github.com/ifurmandev/ukr-text-guard/pull/4) | `idea-brief.md` §7 Recommendation | S | shipped |
 | 5 | Add a quiet hook, off by default, that suggests a check only on long Ukrainian texts with a high score, using thresholds taken from the eval | `idea-brief.md` §7 Recommendation | M | idea |
 
 ## Not yet specified
@@ -40,13 +40,13 @@ Modern human texts by other authors in business mail, blogs and informal fiction
 
 | # | Question | Type | Owner | Blocks |
 |---|---|:---:|:---:|:---:|
-| D2 | Where does the sync check run: before commit, in the eval run, or both? | grilling | human | 4 |
 | D3 | Which minimum text length and which score keep the hook quiet? Closed by the results of step 1. | prototype | agent | 5 |
 | D4 | Which plugin carries the hook? | grilling | human | 5 |
 
 ## Decisions so far
 
 - Human texts come from free sources (public-domain classics, official documents outside copyright) plus the plugin author's own pre-2023 texts, at least one author being another person; modern texts by other authors in business mail, blogs and informal fiction have no free source found and stay uncovered, stated in the README → [`spec.md`](features/human-corpus/spec.md) §1 (closes D1)
+- The divergence check runs on demand, at the start of the eval's shell entry point (stopping the run before any sample) and before every commit after a one-time setup; the eval runner and its tests stay unchanged → [`spec.md`](features/shared-detector/spec.md) §1 (closes D2)
 - Expected ranges are set before looking at detector output, so the eval tests the detector instead of mirroring it → [`idea-brief.md`](idea-brief.md) §6 Risks
 - Exact equality of plugin copies is proven by step 4's own divergence check, while the eval checks only that the bands hold on each copy → [`spec.md`](features/ukr-text-eval/spec.md) §3 Non-goals
 - Shared files are kept as one source plus a sync script, with a check that fails on divergence, because each installed plugin is a copy of its own folder → [`architecture-map.md`](architecture-map.md) Constraints
@@ -79,3 +79,4 @@ flowchart LR
 | 1 · Eval with expected ranges | 2026-10-03 | [changelog](features/ukr-text-eval/changelog.md) · [PR #1](https://github.com/ifurmandev/ukr-text-guard/pull/1) |
 | 2 · Eval table in README | 2026-10-03 | [changelog](features/readme-eval-table/changelog.md) · [PR #2](https://github.com/ifurmandev/ukr-text-guard/pull/2) |
 | 3 · Broader human sample set | 2026-10-03 | [changelog](features/human-corpus/changelog.md) · [PR #3](https://github.com/ifurmandev/ukr-text-guard/pull/3) |
+| 4 · Shared source and sync check | 2026-10-06 | [changelog](features/shared-detector/changelog.md) · [PR #4](https://github.com/ifurmandev/ukr-text-guard/pull/4) |

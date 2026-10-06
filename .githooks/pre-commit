@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Перевіряє вміст індексу перед кожним комітом: копії спільних файлів мають
+# збігатися з shared/. Вмикається раз на клон: git config core.hooksPath .githooks
+# Вердиктів тут немає, вони живуть у tools/shared_sync.py.
+here="$(cd "$(dirname "$0")" && pwd)"
+bypass="a conscious bypass is: git commit --no-verify"
+for cand in python3 python py; do
+  if "$cand" -c "import sys" >/dev/null 2>&1; then
+    "$cand" "$here/../tools/shared_sync.py" check --staged
+    code=$?
+    case "$code" in
+      0) exit 0 ;;
+      3) echo "commit refused: plugin copies differ from the shared source; $bypass" >&2 ;;
+      *) echo "commit refused: the check could not run (exit code $code); $bypass" >&2 ;;
+    esac
+    exit 1
+  fi
+done
+echo "commit refused: the check could not run, no working Python found (tried python3, python, py); $bypass" >&2
+exit 1

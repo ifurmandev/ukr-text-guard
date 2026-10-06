@@ -1,0 +1,95 @@
+{
+  "slug": "shared-detector",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Seed shared/ from the current plugin copies, add carry.json and the .gitattributes line-ending pin",
+      "layer": "infra",
+      "deps": [],
+      "acs": ["AC-14"],
+      "dod": "All 12 plugin copies are byte-identical to their shared/ file, git ls-files --eol shows LF, and git diff --stat shows no change under plugins/, evals/run_eval.py or evals/tests/.",
+      "files_hint": ["shared/", ".gitattributes"],
+      "file": "docs/features/shared-detector/tasks/t1-seed-shared-source.md"
+    },
+    {
+      "id": "T2",
+      "title": "Build the plan core: tree reader interface, carry-list validation and the byte comparator with all divergence kinds",
+      "layer": "domain",
+      "deps": [],
+      "acs": ["AC-03", "AC-06", "AC-12"],
+      "dod": "Unit tests on an in-memory tree catch differing, missing, unlisted and line-endings-only copies and every wrong carry-list entry, and the plan performs no write.",
+      "files_hint": ["tools/shared_sync.py", "tools/tests/test_shared_sync.py"],
+      "file": "docs/features/shared-detector/tasks/t2-plan-core.md"
+    },
+    {
+      "id": "T3",
+      "title": "Add the check command: working-folder reader, report rendering, overwrite notice and the 0/3/4 exit-code contract",
+      "layer": "ports",
+      "deps": ["T1", "T2"],
+      "acs": ["AC-03c", "AC-04", "AC-05"],
+      "dod": "check on the real repository prints 'checked 12 files in 3 plugins' and exits 0, a divergence or wrong carry list exits 3 with the files and plugins named and the overwrite notice, any failure to run exits 4, and no file is written in any branch.",
+      "files_hint": ["tools/shared_sync.py", "tools/tests/test_shared_sync.py"],
+      "file": "docs/features/shared-detector/tasks/t3-check-command.md"
+    },
+    {
+      "id": "T4",
+      "title": "Add the sync command: validate the carry list, rewrite or create diverged copies, never delete",
+      "layer": "app",
+      "deps": ["T2", "T3"],
+      "acs": ["AC-01", "AC-02", "AC-03", "AC-03b", "AC-10"],
+      "dod": "Unit tests show sync rewrites or creates exactly the diverged copies, writes 0 files on a second run and on a wrong carry list, leaves an unlisted file in place with exit 3, and deletes nothing.",
+      "files_hint": ["tools/shared_sync.py", "tools/tests/test_shared_sync.py"],
+      "file": "docs/features/shared-detector/tasks/t4-sync-command.md"
+    },
+    {
+      "id": "T5",
+      "title": "Add the Git index tree reader and the check --staged flag",
+      "layer": "infra",
+      "deps": ["T3"],
+      "acs": ["AC-08"],
+      "dod": "An integration test on a real temporary Git repository shows check --staged fails on a staged divergence with the working folder fixed and passes on a staged-equal copy with the working folder diverged.",
+      "files_hint": ["tools/shared_sync.py", "tools/tests/test_shared_sync.py"],
+      "file": "docs/features/shared-detector/tasks/t5-staged-reader.md"
+    },
+    {
+      "id": "T6",
+      "title": "Add the .githooks/pre-commit hook that refuses the commit on divergence or when the check cannot run",
+      "layer": "wiring",
+      "deps": ["T5"],
+      "acs": ["AC-08", "AC-08b"],
+      "dod": "A hook test in a temporary repository refuses a commit with a staged divergence, allows a clean commit, and refuses with the 'could not run' message naming git commit --no-verify when the check cannot run.",
+      "files_hint": [".githooks/pre-commit", "tools/tests/test_pre_commit_hook.py"],
+      "file": "docs/features/shared-detector/tasks/t6-pre-commit-hook.md"
+    },
+    {
+      "id": "T7",
+      "title": "Extend evals/run.sh to run the check first and end with exit code 3 or 4 on divergence",
+      "layer": "wiring",
+      "deps": ["T3"],
+      "acs": ["AC-07"],
+      "dod": "A run.sh test shows a divergence ends with exit 3 and no sample measured, a check that cannot run ends with exit 4, a clean repository still reaches the unchanged runner, and git diff shows no change in evals/run_eval.py or evals/tests/.",
+      "files_hint": ["evals/run.sh", "tools/tests/test_run_sh.py"],
+      "file": "docs/features/shared-detector/tasks/t7-eval-entry-point-check.md"
+    },
+    {
+      "id": "T8",
+      "title": "Document the shared source, the one-time hook setup and the checked eval path in README and architecture map",
+      "layer": "docs",
+      "deps": ["T4", "T6", "T7"],
+      "acs": ["AC-09", "AC-11"],
+      "dod": "README names the hook setup, its limit and the check and sync commands, and both README and architecture map name shared/ as the edit place, the sync afterwards and evals/run.sh as the only checked eval path.",
+      "files_hint": ["README.md", "docs/architecture-map.md"],
+      "file": "docs/features/shared-detector/tasks/t8-readme-and-architecture-map.md"
+    },
+    {
+      "id": "T9",
+      "title": "Run the acceptance checks: eval parity on all three analyzer copies, plugin folders unchanged, NFRs",
+      "layer": "tests",
+      "deps": ["T1", "T4", "T7", "T8"],
+      "acs": ["AC-13", "AC-14"],
+      "dod": "acceptance.md records the same index and row result on all three analyzer copies as the committed README table, an empty plugins diff, 74 of 74 existing tests passing, and each spec section 6 NFR measured.",
+      "files_hint": ["docs/features/shared-detector/acceptance.md"],
+      "file": "docs/features/shared-detector/tasks/t9-acceptance-run.md"
+    }
+  ]
+}
